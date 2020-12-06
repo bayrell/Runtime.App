@@ -1,0 +1,169 @@
+/*!
+ *  Bayrell Runtime Library
+ *
+ *  (c) Copyright 2016-2020 "Ildar Bikmamatov" <support@bayrell.org>
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+ 
+namespace Runtime.Core;
+
+use Runtime.BaseStruct;
+use Runtime.Monad;
+use Runtime.Core.ApiException;
+use Runtime.Core.Cookie;
+use Runtime.Core.Message;
+use Runtime.Exceptions.RuntimeException;
+
+
+struct RemoteCallAnswer extends BaseStruct
+{
+	/* Dest */
+	string app_name = "self";
+	string object_name = "";
+	string interface_name = "default";
+	string method_name = "";
+	
+	/* Result */
+	int code = 0;
+	string success_message = "";
+	string error_message = "";
+	string error_name = "";
+	string error_trace = "";
+	Collection<string> logs = null;	
+	bool have_answer = false;
+	
+	/* Answer data */
+	primitive response = null;
+	
+	/* Web headers */
+	Dict<Cookie> new_cookies = {};
+	Collection<string> new_headers = [];
+	int new_http_code = 200;
+	
+	
+	/**
+	 * Returns true if success
+	 * @return bool
+	 */
+	bool isSuccess() => this.have_answer and this.code >= rtl::ERROR_OK;
+	
+	
+	
+	/**
+	 * Returns true if success
+	 * @return bool
+	 */
+	bool getMessage() => this.isSuccess() ? this.success_message : this.error_message;
+	
+	
+	
+	/**
+	 * Set success result
+	 * @param primitive res
+	 * @return Message
+	 */
+	pure RemoteCallAnswer success
+	(RemoteCallAnswer answer, primitive response = null, string message = "", int code = 1) =>
+		answer.copy
+		{
+			"code": code,
+			"error_message": "",
+			"success_message": message,
+			"response": response,
+			"have_answer": true,
+		}
+	;
+	
+	
+	
+	/**
+	 * Set fail result
+	 * @param primitive res
+	 * @return Message
+	 */
+	pure RemoteCallAnswer fail
+	(RemoteCallAnswer answer, primitive response, string error = "", int code = -1, string error_name = "") =>
+		answer.copy
+		{
+			"code": code,
+			"error_message": error,
+			"error_name": error_name,
+			"response": response,
+			"have_answer": true,
+		}
+	;
+	
+	
+	
+	/**
+	 * Set exception
+	 * @param primitive res
+	 * @return Message
+	 */
+	pure RemoteCallAnswer exception(RemoteCallAnswer answer, RuntimeException e)
+	{
+		answer = answer.copy
+		{
+			"code": e.getErrorCode(),
+			"error_message": e.getErrorMessage(),
+			"error_name": e.getClassName(),
+			"response": null,
+			"have_answer": true,
+		};
+		
+		if (e instanceof ApiException)
+		{
+			answer <= response <= e.response;
+		}
+		
+		return answer;
+	}
+	
+	
+	
+	/**
+	 * End pipe
+	 */
+	pure Message end(Monad m)
+	{
+		if (m.err == null) return m;
+		return new Monad
+		(
+			new Message
+			{
+				"error_message": m.err.getErrorMessage(),
+				"error_name": m.err.getClassName(),
+				"code": m.err.getErrorCode(),
+				"response": m.err,
+			}
+		);
+	}
+	
+	
+	
+	/**
+	 * Add cookie
+	 */
+	pure RemoteCallAnswer addCookie(RemoteCallAnswer answer, var cookie)
+	{
+		string cookie_name = cookie["name"];
+		if (answer.new_cookies == null)
+		{
+			answer <= new_cookies <= new Dict();
+		}
+		answer <= new_cookies <= answer.new_cookies.setIm(cookie_name, cookie);
+		return answer;
+	}
+	
+}

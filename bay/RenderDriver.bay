@@ -1,0 +1,1300 @@
+/*!
+ *  Bayrell Runtime Library
+ *
+ *  (c) Copyright 2016-2020 "Ildar Bikmamatov" <support@bayrell.org>
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+
+namespace Runtime.Web;
+
+use Runtime.lib;
+use Runtime.IntrospectionInfo;
+use Runtime.RuntimeUtils;
+use Runtime.Core.BusDriverInterface;
+use Runtime.Core.CoreDriver;
+use Runtime.Core.RemoteCallAnswer;
+use Runtime.Core.RemoteCallRequest;
+use Runtime.Core.Request;
+use Runtime.Core.Response;
+use Runtime.Web.FrontendStorageDriver;
+use Runtime.Web.Layout;
+use Runtime.Web.LayoutModel;
+use Runtime.Web.Pattern;
+use Runtime.Web.RenderContainer;
+use Runtime.Web.RenderController;
+use Runtime.Web.Request;
+use Runtime.Web.RouteMiddleware;
+
+
+class RenderDriver extends CoreDriver
+{
+	/* Chains */
+	static const string LAYOUT_CHAIN = "Runtime.Web.Layout";
+	static const string PATTERN_CHAIN = "Runtime.Web.Pattern";
+	static const string RENDER_CHAIN = "Runtime.Web.Render";
+	static const string TITLE_CHAIN = "Runtime.Web.Title";
+	static const string API_EXTERNAL_BUS_CHAIN = "Runtime.Web.Api.ExternalBus";
+	static const string API_EXTERNAL_BUS_PREPARE_CHAIN = "Runtime.Web.Api.ExternalBusPrepare";
+	static const string API_BACKEND_PREPARE_CHAIN = "Runtime.Web.Api.BackendPrepareChain";
+	
+	/* Render Chain */
+	static const int RENDER_CHAIN_START = 500;
+	static const int RENDER_CHAIN_CREATE_LAYOUT_MODEL = 950;
+	static const int RENDER_CHAIN_CHANGE_LAYOUT_MODEL = 1000;
+	static const int RENDER_CHAIN_SET_FRONTEND_ENVIROMENTS = 1500;
+	static const int RENDER_CHAIN_SET_FRONTEND_STORAGE = 1500;
+	static const int RENDER_CHAIN_CALL_ROUTE_BEFORE = 2000;
+	static const int RENDER_CHAIN_CALL_ROUTE_MIDDLEWARE = 2500;
+	static const int RENDER_CHAIN_CALL_ROUTE = 3000;
+	static const int RENDER_CHAIN_CALL_PAGE_NOT_FOUND = 3100;
+	static const int RENDER_CHAIN_CALL_ROUTE_AFTER = 3500;
+	static const int RENDER_CHAIN_RESPONSE_BEFORE = 4000;
+	static const int RENDER_CHAIN_RESPONSE = 4500;
+	static const int RENDER_CHAIN_RESPONSE_AFTER = 5000;
+	
+	protected Map<bool> listen_events = new Map();
+	
+	
+	/**
+	 * Start controller
+	 */
+	public async void startDriver()
+	{
+	}
+	
+	
+	
+	/**
+	 * Bind es6 event
+	 */
+	protected void bindGlobalEvent(string event_class_name)
+	{
+		if (not this.listen_events.has(event_class_name))
+		{
+			#ifcode JAVASCRIPT then
+			var body = document.getElementsByTagName("body")[0];
+			body._path_id = this.getObjectName();
+			var event_class = use(event_class_name);
+			if (event_class == undefined) return false;
+			
+			var es6_name = event_class.ES6_EVENT_NAME;
+			if (es6_name == undefined) return false;
+			
+			body.addEventListener(es6_name, Runtime.Web.RenderDriver.js_event);
+			#endif
+			
+			this.listen_events.setValue(event_class_name, true);
+		}
+		
+		return true;
+	}
+	
+	
+	
+	/**
+	 * Start listen event
+	 */
+	public void registerGlobalListener(string event_class_name, string object_name, string method_name = "")
+	{
+		if (this.bindGlobalEvent(event_class_name))
+		{
+			@.registerListener(this.getObjectName(), event_class_name, object_name, method_name);
+		}
+	}
+	
+	
+	
+	/**
+	 * Returns main controller
+	 */
+	public static RenderController getMainController()
+	{
+		Collection<RenderController> controllers = @.getDrivers(classof RenderController);
+		for (int i=0; i<controllers.count(); i++)
+		{
+			RenderController controller = controllers[i];
+			if (controller.isMainController())
+			{
+				return controller;
+			}
+		}
+		return null;
+	}
+	
+	
+	
+	/**
+	 * JS Event
+	 */
+	public static void @js_event(var e)
+	{
+		#ifcode JAVASCRIPT then
+		var ctx = Runtime.RuntimeUtils.getContext();
+		var path_id = e.currentTarget._path_id;
+		var event = Runtime.Web.Events.WebEvent.fromEvent(ctx, e);
+		
+		/* Send signal */
+		(async () => {
+			try
+			{
+				var msg = new Runtime.Core.Message(ctx, event, path_id);
+				msg.sender = event.target;
+				await ctx.object_manager.handleMessage(ctx, msg);
+			}
+			catch (e)
+			{
+				console.log(e.stack);
+			}
+		})();
+		#endif
+	}
+	
+	
+	
+	/**
+	 * Retuns css hash
+	 * @param string component class name
+	 * @return string hash
+	 */
+	static memorize string getCssHash(string s)
+	{
+		string r = "";
+		string a = "1234567890abcdef";
+		int sz = rs::strlen(s);
+		int h = 0;
+		for (int i=0; i<sz; i++)
+		{
+			int c = rs::ord( rs::substr(s, i, 1) );
+			h = ((h << 2) + (h >> 14) + c) & 65535;
+		}
+		int p = 0;
+		while (h != 0 or p < 4)
+		{
+			int c = h & 15;
+			h = h >> 4;
+			r ~= rs::substr(a, c, 1);
+			p = p + 1;
+		}
+		return r;
+	}
+	
+	
+	
+	/**
+	 * Returns css name
+	 */
+	pure memorize string getCssName(string class_name, string css_name)
+	{
+		Collection<string> arr = rs::split(" ", css_name);
+		Collection<string> class_names = RuntimeUtils::getParents(class_name);
+		
+		class_names = class_names.filter
+		(
+			bool (string class_name) =>
+				class_name != "Runtime.BaseObject" and
+				class_name != "Runtime.Core.CoreObject" and
+				class_name != "Runtime.Web.Component"
+		);
+		
+		arr = arr.map
+		(
+			string (string css_name) use (class_names)
+			{
+				Collection<string> s1 = class_names.map
+				(
+					string (string class_name) use (css_name)
+					{
+						string hash = static::getCssHash(class_name);
+						return css_name ~ "-" ~ hash;
+					}
+				);
+				
+				string s2 = rs::join(" ", s1);
+				return s2;
+			}
+		);
+		
+		string name = rs::join(" ", arr);
+		return name;
+	}
+	
+	
+	
+	/**
+	 * Returns css hash
+	 */
+	pure memorize string getCssHashes(string class_name)
+	{
+		Collection<string> class_names = RuntimeUtils::getParents(class_name);
+		class_names = class_names.filter
+		(
+			bool (string class_name) =>
+				class_name != "Runtime.BaseObject" and
+				class_name != "Runtime.Core.CoreObject" and
+				class_name != "Runtime.Web.Component"
+		);
+		class_names = class_names.map
+		(
+			string (string class_name) => "h-" ~ static::getCssHash(class_name)
+		);
+		return rs::join(" ", class_names);
+	}
+	
+	
+	
+	/**
+	 * Returns required modules
+	 * @param string class_name
+	 * @return Collection<string>
+	 */
+	static void _getRequiredComponents
+	(
+		Vector<string> res,
+		Map<string> cache,
+		Collection<string> components
+	)
+	{
+		if (components == null)
+			return;
+		
+		for (int i=0; i<components.count(); i++)
+		{
+			string class_name = components.item(i);
+			if (cache.get(class_name, false) == false)
+			{
+				cache.setValue(class_name, true);
+				if (rtl::method_exists(class_name, "components"))
+				{
+					fn f = rtl::method(class_name, "components");
+					Dict<string> sub_components = f();
+					if (sub_components != null)
+					{
+						static::_getRequiredComponents(res, cache, sub_components);
+					}
+				}
+				res.pushValue(class_name);
+			}
+		}
+	}
+	
+	
+	
+	/**
+	 * Returns all components
+	 * @param Collection<string> components
+	 * @return Collection<string>
+	 */
+	pure Collection<string> getRequiredComponents(Collection<string> components)
+	{
+		Vector<string> res = new Vector();
+		Map<string> cache = new Map();
+		static::_getRequiredComponents(res, cache, components);
+		res = res.removeDuplicates();
+		return res.toCollection();
+	}
+	
+	
+	
+	/**
+	 * Returns all layout components
+	 * @param LayoutModel layout
+	 * @return Collection<string>
+	 */
+	pure Collection<string> getLayoutComponents(LayoutModel layout)
+	{
+		Collection<string> components = [];
+		if (layout.layout_class != "") components = components.pushIm(layout.layout_class);
+		if (layout.page_class != "") components = components.pushIm(layout.page_class);
+		if (layout.components != null) components = components.appendCollectionIm(layout.components);
+		components = components.removeDuplicates();
+		components = RenderDriver::getRequiredComponents(components);
+		components = components.filter( lib::equalNot("") );
+		return components;
+	}
+	
+	
+	
+	/**
+	 * Returns css string
+	 * @param Collection<string> components
+	 * @param Dict<string> css_vars
+	 * @return string
+	 */
+	pure memorize string getCSSFromComponents(Collection<string> components, Dict<string> css_vars)
+	{
+		Vector<string> res = new Vector();
+		if (components != null)
+		{
+			for (int i=0; i<components.count(); i++)
+			{
+				string component_name = components.item(i);
+				if (rtl::method_exists(component_name, "css"))
+				{
+					fn f = rtl::method(component_name, "css");
+					string css = f(css_vars);
+					if (not rtl::isEmpty(css)) res.pushValue(css);
+				}
+			}
+		}
+		string s = res.reduce( string (string res, string s) => res ~ s, "" );
+		return s;
+	}
+	
+	
+	
+	/**
+	 * Returns css
+	 */
+	string getLayoutCSS(LayoutModel layout)
+	{
+		Collection<string> components = RenderDriver::getLayoutComponents(layout);
+		string css = RenderDriver::getCSSFromComponents(components, layout.css_vars);
+		return css;
+	}
+	
+	
+	
+	/**
+	 * Returns title
+	 */
+	pure string chainTitle(LayoutModel layout, string title)
+	{
+		title = @.chain(static::TITLE_CHAIN, [layout, title]) |> attr 1;
+		return title;
+	}
+	
+	
+	
+	/**
+	 * Layout chain
+	 */
+	pure LayoutModel chainLayout(LayoutModel layout)
+	{
+		layout = @.chain(static::LAYOUT_CHAIN, [layout]) |> attr 0;
+		return layout;
+	}
+	
+	
+	
+	/**
+	 * Render chain
+	 */
+	static async RenderContainer chainRender(RenderContainer container)
+	{
+		container = await @.chainAsync(static::RENDER_CHAIN, [container]) |> attr 0;
+		return container;
+	}
+	
+	
+	
+	/**
+	 * Layout chain
+	 */
+	pure LayoutModel layoutChainDefault(LayoutModel layout)
+	{
+		if (layout.layout_name == "default" and layout.layout_class == "" or layout.layout_class == "")
+		{
+			layout <= layout_class <= classof Layout;
+		}
+		return [ layout ];
+	}
+	
+	
+	
+	/**
+	 * Split route prefix
+	 */
+	pure memorize string splitRoutePrefix(string request_uri, string route_prefix)
+	{
+		int prefix_len = rs::strlen(route_prefix);
+		if (prefix_len > 0)
+		{
+			int pos = rs::search(request_uri, route_prefix);
+			if (pos == -1)
+			{
+				return null;
+			}
+			request_uri = rs::substr(request_uri, prefix_len);
+		}
+		if (request_uri == "") request_uri = "/";
+		return request_uri;
+	}
+	
+	
+	
+	/**
+	 * Render chain
+	 * Create layout model
+	 */
+	static RenderContainer renderChainCreateLayoutModel(RenderContainer container)
+	{
+		if (container == null) return [ container ];
+		if (container.isResponseExists()) return [ container ];
+		
+		FrontendStorageDriver driver = @.getDriver(classof FrontendStorageDriver);
+		Dict frontend_keep_data = {};
+		
+		/* Load frontend data */
+		if (driver != null and container.frontend_controller_name != "")
+		{
+			LayoutModel old_layout = driver.loadControllerModel(container.frontend_controller_name);
+			if (old_layout != null)
+			{
+				frontend_keep_data = old_layout.keep_data;
+			}
+		}
+		
+		/* Create LayoutModel */
+		container <= layout <= new LayoutModel
+		{
+			"uri": static::splitRoutePrefix(container.request.uri, container.request.route_prefix),
+			"f_inc": @.config(["Runtime.Web", "f_inc"], "1"),
+			"full_uri": container.request.uri,
+			"route": container.route,
+			"route_prefix": container.request.route_prefix,
+			"route_params": container.route_params,
+			"keep_data": frontend_keep_data,
+			"css_vars":
+			{
+				"colors":
+				{
+					"default":
+					{
+						"color": "#fff",
+						"background": "#fff",
+						"border": "#ccc",
+						"text": "#000",
+						"hover-background": "#eee",
+						"hover-text": "inherit",
+					},
+					
+					"active":
+					{
+						"color": "#337ab7",
+						"background": "#337ab7",
+						"border": "#22527b",
+						"text": "#fff",
+						"hover-background": "#337ab7",
+						"hover-text": "#fff",
+					},
+					
+					"primary":
+					{
+						"color": "#337ab7",
+						"background": "#337ab7",
+						"border": "#22527b",
+						"text": "#fff",
+						"hover-background": "#286090",
+						"hover-text": "#fff",
+						"active-background": "#286090",
+						"active-tet": "#fff",
+					},
+					
+					"danger":
+					{
+						"color": "#d14b42",
+						"background": "#d14b42",
+						"border": "#a02e27",
+						"text": "#fff",
+						"hover-background": "#e60000",
+						"hover-text": "#fff",
+						"active-background": "#e60000",
+						"active-tet": "#fff",
+					},
+					
+					"success":
+					{
+						"color": "green",
+						"background": "green",
+						"border": "green",
+						"text": "#fff",
+						"hover": "green",
+						"hover-text": "#fff",
+						"active": "green",
+						"active-tet": "#fff",
+					},
+					
+					"error":
+					{
+						"color": "#d14b42",
+						"background": "#d14b42",
+						"border": "#a02e27",
+						"text": "#fff",
+						"hover-background": "#e60000",
+						"hover-text": "#fff",
+						"active-background": "#e60000",
+						"active-tet": "#fff",
+					},
+					
+					"warning":
+					{
+						"color": "yellow",
+						"background": "yellow",
+						"border": "yellow",
+						"text": "#fff",
+						"hover": "yellow",
+						"hover-text": "#fff",
+						"active": "yellow",
+						"active-tet": "#fff",
+					},
+					
+				},
+				"font":
+				{
+					"size": "14px",
+				},
+			},
+		};
+		
+		return [ container ];
+	}
+	
+	
+	
+	#ifdef BACKEND then
+	
+	/**
+	 * Layout chain
+	 */
+	pure RenderContainer renderChainSetFrontendEnv(RenderContainer container)
+	{
+		container <= frontend_env <= "APP_MODE" <= @.env("APP_MODE", "prod");
+		container <= frontend_env <= "X-APP-HASH" <= RenderDriver::getCssHash(@.main_class);
+		container <= frontend_env <= "X-ROUTE-PREFIX" <= @.env("X-ROUTE-PREFIX", "");
+		return [ container ];
+	}
+	
+	#endif
+	
+	
+	
+	/**
+	 * Render chain
+	 * Call route middlewares
+	 */
+	static async RenderContainer renderChainCallRouteMiddleware(RenderContainer container)
+	{
+		if (container == null) return [ container ];
+		if (container.isResponseExists()) return [ container ];
+		if (container.isPageExists()) return [ container ];
+		if (not container.isRouteExists()) return [ container ];
+		
+		Collection<RouteMiddleware> middlewares = [];
+		
+		/* Get middleware from class */
+		fn getMethodInfoByName = rtl::method(container.route.class_name, "getClassInfo");
+		IntrospectionInfo info = getMethodInfoByName();
+		middlewares = middlewares.concatIm
+		(
+			info.annotations.filter( lib::isInstance(classof RouteMiddleware) )
+		)
+		
+		/* Get middleware from method */
+		fn getMethodInfoByName = rtl::method(container.route.class_name, "getMethodInfoByName");
+		IntrospectionInfo info = getMethodInfoByName(container.route.class_method_name);
+		middlewares = middlewares.concatIm
+		(
+			info.annotations.filter( lib::isInstance(classof RouteMiddleware) )
+		);
+		
+		/* Run each middleware */
+		for (int i=0; i<middlewares.count(i); i++)
+		{
+			RouteMiddleware m = middlewares.item(i);
+			Collection arr = rs::split("::", m.value);
+			string class_name = arr.get(0, "");
+			string method_name = arr.get(1, "");
+			fn f = rtl::method(class_name, method_name);
+			
+			/* Run method */
+			list res = await f(container);
+			container = res[0];
+		}
+		
+		return [ container ];
+	}
+	
+	
+	
+	/**
+	 * Render chain
+	 * Call route
+	 */
+	static async RenderContainer renderChainCallRoute(RenderContainer container)
+	{
+		if (container == null) return [ container ];
+		if (container.isResponseExists()) return [ container ];
+		if (container.isPageExists()) return [ container ];
+		if (not container.isRouteExists()) return [ container ];
+		
+		fn f = rtl::method(container.route.class_name, container.route.class_method_name);
+		list res = await f(container);
+		container = res[0];
+		
+		return [ container ];
+	}
+	
+	
+	
+	#ifdef BACKEND then
+	
+	/**
+	 * Render chain. Set default pattern
+	 */
+	pure RenderContainer renderChainPatternDefault(RenderContainer container)
+	{
+		if (container.pattern_name == "default" and container.pattern_class == "" or container.pattern_class == "")
+		{
+			container <= pattern_class <= classof Pattern;
+		}
+		return [ container ];
+	}
+	
+	
+	
+	/**
+	 * Render chain
+	 * Create layout model
+	 */
+	static RenderContainer renderChainCreateResponse(RenderContainer container)
+	{
+		if (container == null) return [ container ];
+		if (container.isResponseExists()) return [ container ];
+		
+		/* Get params */
+		LayoutModel layout = RenderDriver::chainLayout(container.layout);
+		Dict params = {};
+		
+		/* Render layout */
+		fn render = rtl::method(layout.layout_class, "render");
+		string layout_content = render(layout, layout, {}, null);
+		
+		/* Render pattern */
+		fn render = rtl::method(container.pattern_class, "render");
+		string patter_content = render(container, layout, params, layout_content);
+		
+		/* Create response */
+		container <= response <= new Response
+		{
+			"content": patter_content,
+			"headers": container.new_headers,
+			"http_code": container.new_http_code,
+		};
+		
+		return [ container ];
+	}
+	
+	#endif
+	
+	
+	
+	/**
+	 * Returns rect of elem
+	 */
+	static Dict getRect(var elem)
+	{
+		int x = 0, y = 0, w = 0, h = 0;
+		#ifcode JAVASCRIPT then
+		x = elem.offsetLeft;
+		y = elem.offsetTop;
+		w = elem.clientWidth;
+		h = elem.clientHeight;
+		#endif
+		return { "x": x, "y": y, "w": w, "h": h };
+	}
+	
+	
+	
+	/**
+	 * Remote bus call
+	 * @param Dict items
+	 * @return RemoteCallAnswer
+	 */
+	static async RemoteCallAnswer externalBusCall(Dict items)
+	{
+		/* Set default params */
+		items = items.copy
+		{
+			"app_name": items.get("app_name", "self"),
+			"interface_name": items.get("interface_name", "default"),
+		};
+		
+		/* Change api request */
+		RemoteCallRequest request = new RemoteCallRequest(items);
+		list res = await @.chainAsync(RenderDriver::API_EXTERNAL_BUS_CHAIN, [request]);
+		request = res[0];
+		
+		/* Send request */
+		BusDriverInterface bus = @.getDriver("default:external_bus");
+		RemoteCallAnswer answer = await bus.remoteBusCall(request);
+		
+		return answer;
+	}
+}
+
+
+#ifcode JAVASCRIPT then
+window["RenderDriver"] = Runtime.Web.RenderDriver;
+
+
+Object.assign(Runtime.Web.RenderDriver,
+{
+	
+	
+	/**
+	 * Returns true if is elem
+	 */
+	isElem(o)
+	{
+		if (o instanceof HTMLElement || o instanceof Node) return true;
+		return false;
+	},
+	
+	
+	
+	/**
+	 * Return HTML elems from string
+	 */
+	createElementFromHTML(s)
+	{
+		var res = [];
+		var e = document.createElement('div');
+		e.innerHTML = s.trim();
+		for (var i = 0; i < e.childNodes.length; i++) res.push( e.childNodes[i] );
+		return res;
+	},
+	
+	
+	
+	/**
+	 * Decode html entities
+	 */
+	decodeHtmlEntities(s)
+	{
+		var e = document.createElement('textarea');
+		e.innerHTML = s;
+		return e.value;
+	},
+	
+	
+	
+	/**
+	 * Returns elem by index
+	 */
+	getElemChild: function(parent_elem, index)
+	{
+		if (index < 0 || index >= parent_elem.childNodes.length) return null;
+		return parent_elem.childNodes[index];
+	},
+	
+	
+	
+	/**
+	 * Returns previous element
+	 */
+	getPreviousElement: function(elem)
+	{
+		var previous = null;
+		var parent_elem = elem.parentElement;
+		for (var i = 0; i < parent_elem.childNodes.length; i++)
+		{
+			var e = parent_elem.childNodes[i];
+			if (e == elem)
+			{
+				return previous;
+			}
+			previous = e;
+		}
+		return null;
+	},
+	
+	
+	
+	/**
+	 * Find elem pos by virtual path
+	 */
+	findElemPosByPath: function(parent_elem, path)
+	{
+		for (var i = 0; i < parent_elem.childNodes.length; i++)
+		{
+			var e = parent_elem.childNodes[i];
+			if (e._path_id == path)
+			{
+				return i;
+			}
+		}
+		return -1;
+	},
+	
+	
+	
+	/**
+	 * Find elem by virtual path
+	 */
+	findElemByPath: function(parent_elem, path_id, kind)
+	{
+		var pos = this.findElemPosByPath(parent_elem, path_id);
+		return this.getElemChild(parent_elem, pos);
+	},
+	
+	
+	
+	/**
+	 * Find elem by virtual path and check
+	 */
+	findElemByPathAndCheck: function(parent_elem, path_id, kind)
+	{
+		var pos = this.findElemPosByPath(parent_elem, path_id);
+		var elem_new = this.getElemChild(parent_elem, pos);
+		
+		/* Check element */
+		if (elem_new != null)
+		{
+			if (kind == "element")
+			{
+				if (elem_new.tagName == undefined)
+				{
+					elem_new = null;
+				}
+			}
+		}
+		
+		return elem_new;
+	},
+	
+	
+	
+	/**
+	 * Build Virtual Path
+	 */
+	buildPath: function(control, params, index)
+	{
+		var key = ""; var elem_name = "";
+		if (params != null)
+		{
+			if (params["@key"] != undefined) key = params["@key"];
+			if (params["@elem_name"] != undefined) elem_name = params["@elem_name"];
+		}
+		if (key == "")
+		{
+			key = (elem_name != "") ? (elem_name + "-" + index) : index;
+		}
+		var path_id = control.path_id;
+		return "" + path_id + ((path_id != "") ? "." : "") + key;
+	},
+	
+	
+	
+	/**
+	 * Normalize childs
+	 */
+	_normalizeChilds: function(res, childs)
+	{
+		for (var i=0; i<childs.length; i++)
+		{
+			var item = childs[i];
+			if (item instanceof Array)
+			{
+				res = this._normalizeChilds(res, item);
+			}
+			else
+			{
+				res.push(item);
+			}
+		}
+		return res;
+	},
+	
+	
+	
+	/**
+	 * Normalize content
+	 */
+	normalizeContent: function(content, control)
+	{
+		if (content == null) return null;
+		if (typeof content == "function" || content instanceof Function) content = content(control);
+		if (this.isElem(content)) return content;
+		if (content instanceof Array)
+		{
+			var new_content = [];
+			for (var i=0; i<content.length; i++)
+			{
+				var item = this.normalizeContent(content[i], control);
+				if (item != null) new_content.push(item);
+			}
+			
+			var res = [];
+			this._normalizeChilds(res, new_content);
+			
+			return Runtime.Collection.from(res);
+		}
+		
+		return content;
+	},
+	
+	
+	
+	/**
+	 * Element
+	 */
+	e: function (control, childs, type, obj)
+	{
+		var index = childs.length;
+		var new_control = null;
+		var parent_elem = control.parent_elem;
+		var name = (obj != null) ? obj.name : "";
+		var attrs = (obj != null && obj.attrs != null && obj.attrs != undefined) ? obj.attrs : null;
+		var content = (obj != null && obj.content != null && obj.content != undefined) ? obj.content : null;
+		var path_id = this.buildPath(control, attrs, index);
+		var controller = control.controller;
+		var ctx = control.ctx;
+		
+		/* Normalize content */
+		if (content != null && typeof content == "function")
+		{
+			content = this.normalizeContent(content, control);
+		}
+		
+		if (type == 'component')
+		{
+			var model = null;
+			var model_path = null;
+			var created = false;
+			
+			/* Find class */
+			var class_obj = use(name);
+			if (class_obj == undefined)
+			{
+				throw new Error("Component " + name + " not found");
+			}
+			
+			/* Find component */
+			var component = controller.getComponent(ctx, path_id, name);
+			if (component == null)
+			{
+				/* Create component */
+				component = new class_obj(ctx, path_id, controller);
+				component.driver = control.driver;
+				controller.saveComponent(ctx, component);
+				created = true;
+			}
+			
+			/* Find model */
+			if (attrs != null && attrs["@bind"] != undefined)
+			{
+				model_path = controller.getBindModelPath(ctx, path_id, attrs["@bind"]);
+			}
+			if (attrs != null && attrs["@name"] != undefined)
+			{
+				model_path = controller.getBindModelPath(ctx, path_id, attrs["@name"]);
+			}
+			
+			/* Get model */
+			if (model_path != null)
+			{
+				model = Runtime.rtl.attr(ctx, controller.layout, model_path, null);
+				attrs["model"] = model;
+			}
+			
+			/* Create new control */
+			new_control = control.copy(ctx, {
+				"type": type,
+				"index": index,
+				"path_id": path_id,
+				"component": component,
+				"model": model,
+			});
+			
+			/* Render optimization */
+			/*
+			if (!created)
+			{
+				if (this.equalAttrs(component.old_attrs, attrs) && component.old_model == model)
+				{
+					childs.push( component.elements.slice() );
+					return [new_control, childs];
+				}
+			}
+			*/
+			
+			/* Get dict attrs */
+			var dict_attrs = Runtime.Dict.from(attrs);
+			
+			/* Set new model */
+			component.setParams(ctx, dict_attrs);
+			component.setModelPath(ctx, model_path);
+			component.setParent(ctx, control.component);
+			component.old_attrs = attrs;
+			component.old_model = model;
+			
+			/* Set reference */
+			if (attrs != null && attrs["@ref"] != undefined)
+			{
+				controller.setReference(ctx, component.path_id, attrs["@ref"], component);
+			}
+			if (attrs != null && attrs["@name"] != undefined)
+			{
+				controller.setReference(ctx, component.path_id, attrs["@name"], component);
+			}
+			
+			if (!component.isRepaintOverridden(ctx, new_control))
+			{
+				/* Render component */
+				var render = class_obj.render.bind(class_obj);
+				var res = render
+				(
+					ctx, controller.layout, model, dict_attrs, content
+				);
+				
+				/* Call result */
+				if (res != null && typeof res == "function") res = res(new_control);
+				
+				/* Normalize content */
+				res = this.normalizeContent(res, new_control);
+				
+				/* Add childs */
+				childs = childs.slice();
+				if (res != null) childs.push(res);
+				
+				/* Set childs */
+				component.elements = childs;
+			}
+			else
+			{
+				/* Render component */
+				var res = component.repaint(ctx, controller.layout, model, dict_attrs, content, new_control, created);
+				
+				/* Call result */
+				if (res != null && typeof res == "function") res = res(new_control);
+				
+				/* Normalize content */
+				res = this.normalizeContent(res, new_control);
+				
+				/* Add childs */
+				childs = childs.slice();
+				if (res != null) childs.push(res);
+			}
+			
+			controller.updateComponent(ctx, new_control, component, created);
+			controller.bindEvents(ctx, new_control, component, attrs, created);
+		}
+		
+		else if (type == 'element')
+		{
+			var elem_new = this.findElemByPathAndCheck(parent_elem, path_id, type);
+			var is_new_elem = false;
+			
+			/* Create new element */
+			if (elem_new == null)
+			{
+				elem_new = document.createElement(name);
+				is_new_elem = true;
+				
+				var test_e = this.findElemByPathAndCheck(parent_elem, path_id, type);
+				/*console.log(elem_new);*/
+			}
+			
+			/* Create new control */
+			new_control = control.copy(ctx, {
+				"type": type,
+				"index": index,
+				"path_id": path_id,
+				"parent_elem": elem_new,
+				"is_new_elem": is_new_elem,
+			});
+			
+			/* Update element params */
+			elem_new._attrs = attrs;
+			elem_new._path_id = path_id;
+			elem_new._component = control.component;
+			elem_new.params = Runtime.Dict.from(attrs);
+			
+			/* Update element params */
+			controller.updateElemParams(ctx, new_control, elem_new);
+			
+			/* Add childs */
+			childs = childs.slice();
+			childs.push(elem_new);
+		}
+		
+		else if (this.isElem(content))
+		{
+			childs = childs.slice();
+			childs.push(content);
+		}
+		else if (content instanceof Array)
+		{
+			childs = childs.slice();
+			childs.push(content);
+		}
+		else if (typeof content == "function" || content instanceof Function)
+		{
+			childs = childs.slice();
+			
+			/* Create new control */
+			new_control = control.copy(ctx, {
+				"type": type,
+				"index": index,
+				"path": path_id,
+			});
+			content = this.normalizeContent(content, new_control);
+			childs.push(content);
+		}
+		
+		else if (type == 'raw')
+		{
+			/* To string */
+			content = Runtime.rtl.toStr(content);
+			
+			/* Create new element */
+			var elem_new = this.createElementFromHTML(content);
+			
+			/* Add childs */
+			childs = childs.slice();
+			childs.push(elem_new);
+		}
+		
+		else if (type == 'text')
+		{
+			/* To string */
+			content = Runtime.rtl.toStr(content);
+			content = this.decodeHtmlEntities(content);
+			
+			var elem_new = this.findElemByPathAndCheck(parent_elem, path_id, type);
+			
+			/* Create new element */
+			if (elem_new == null)
+			{
+				elem_new = document.createTextNode(content);
+			}
+			else
+			{
+				if (elem_new.nodeValue != content)
+				{
+					elem_new.nodeValue = content;
+				}
+			}
+			
+			/* Set elem path */
+			elem_new._path_id = path_id;
+			
+			/* Add childs */
+			childs = childs.slice();
+			childs.push(elem_new);
+		}
+		
+		else if (type == 'html')
+		{
+			
+		}
+		
+		else if (type == 'empty')
+		{
+			new_control = control;
+		}
+		
+		return [new_control, childs];
+	},
+	
+	
+	
+	/**
+	 * Patch childs of the control
+	 */
+	p: function (control, childs)
+	{
+		if (control.type == "empty")
+		{
+			return;
+		}
+		
+		var controller = control.controller;
+		var ctx = control.ctx;
+		
+		/* Normalize content */
+		var childs = this.normalizeContent(childs, control);
+		
+		/* Patch element */
+		controller.patchElemChilds(ctx, control.parent_elem, childs);
+		
+		/* Patch element params */
+		/* controller.updateElemParams(ctx, control, control.parent_elem); */
+	},
+	
+	
+	
+	/**
+	 * Find listeners
+	 */
+	findListeners: function (path_id)
+	{
+		var arr = [];
+		var ctx = globalContext;
+		for (var i=0; i<ctx.object_manager.listeners.count(); i++)
+		{
+			var listener = ctx.object_manager.listeners[i];
+			var from = listener.get(ctx, "from");
+			if (from.indexOf(path_id) == 0) arr.push(listener);
+		}
+		return Runtime.Collection.from(arr);
+	},
+	
+	
+	
+	/**
+	 * Find objects by path
+	 */
+	findObjects: function (path_id)
+	{
+		var arr = [];
+		var ctx = globalContext;
+		var keys = ctx.object_manager.objects.keys(ctx);
+		for (var i=0; i<keys.count(); i++)
+		{
+			var key = keys[i];
+			var object = ctx.object_manager.objects.get(ctx, key);
+			if (object.path_id != undefined && object.path_id.indexOf(path_id) == 0) arr.push(object);
+		}
+		return Runtime.Collection.from(arr);
+	},
+	
+	
+	
+	/**
+	 * Returns object
+	 */
+	getObject: function (path_id)
+	{
+		var ctx = globalContext;
+		return ctx.object_manager.objects.get(ctx, path_id);
+	},
+	
+	
+	
+	/**
+	 * Nodes to Array
+	 */
+	nodesArray: function(nodes)
+	{
+		var arr = [];
+		for (var i=0; i<nodes.length; i++)
+		{
+			arr.push(nodes[i]);
+		}
+		return arr;
+	}
+	
+});
+#endif
