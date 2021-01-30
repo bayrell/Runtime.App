@@ -102,6 +102,31 @@ class WebApp extends BaseDriver
 	
 	
 	/**
+	 * Web App Run
+	 */
+	static async void appRun()
+	{
+		string root_model = window.document.@querySelector("#root_model").value;
+		root_model = rs::base64_decode_url(root_model);
+		LayoutModel layout = rtl::json_decode(root_model);
+		
+		@.getDriver("RenderDriver")
+			.setLayout(layout)
+			.setupCSS( window.document.@querySelector("#root_style") )
+			.setupController
+			(
+				"root",
+				window.document.@querySelector("#root"),
+				layout.layout_class,
+				[]
+			)
+			.repaint()
+		;
+	}
+	
+	
+	
+	/**
 	 * Render request
 	 */
 	async RenderContainer renderRequest(Request request)
