@@ -1,5 +1,6 @@
 /es6
 /php
+/tmp
 !/nodejs/
 /nodejs/*
 !/nodejs/index.js

@@ -16,15 +16,12 @@
  *  limitations under the License.
  */
  
-namespace Runtime.Web;
+namespace Runtime.Web.App;
 
-use Runtime.Web.LayoutModel;
-use Runtime.Web.Pattern;
-use Runtime.Web.RenderContainer;
-use Runtime.Web.RenderDriver;
-use Runtime.Web.Request;
-use Runtime.Web.Response;
-use Runtime.Web.RouteController;
+use Runtime.Web.App.RenderContainer;
+use Runtime.Web.App.Request;
+use Runtime.Web.App.Response;
+use Runtime.Web.App.WebApp;
 
 
 static class CGI
@@ -35,9 +32,9 @@ static class CGI
 	 */
 	static async void appRun()
 	{
-		RouteController controller = @.getDriver(classof RouteController);
+		WebApp app = @.getDriver("WebApp");
 		Request request = static::createRequest();
-		RenderContainer container = await controller.renderRequest(request);
+		RenderContainer container = await app.renderRequest(request);
 		static::output(container);
 	}
 	
@@ -79,7 +76,7 @@ static class CGI
 		}
 		$arr = parse_url($uri);
 		$uri = isset($arr['path']) ? $arr['path'] : "";
-		$r = new \Runtime\Core\Request
+		$r = new \Runtime\Web\App\Request
 		(
 			$ctx, 
 			\Runtime\Dict::from([

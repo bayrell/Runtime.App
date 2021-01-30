@@ -15,24 +15,16 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-
+ 
 namespace Runtime.Web.App;
 
 use Runtime.BaseStruct;
+use Runtime.Entity;
 
 
-struct SeoModel extends BaseStruct
+struct ApiList extends Entity
 {
-	/* Breadcrumbs */
-	Collection<Dict> breadcrumbs = null;
-	string og_type = "";
-	string og_image = "";
-	string og_site_name = "";
-	string og_publisher = "";
-	Collection<string> robots = null;
-	Collection<string> article_tags = null;
-	Collection<string> keywords = null;
-	DateTime published = null;
-	DateTime modified = null;
-	Collection<Dict> meta_tags = null;
+	string object_name = "";
+	string interface_name = "";
+	string apiName() => this.object_name != "" ? this.object_name : this.getClassName();
 }

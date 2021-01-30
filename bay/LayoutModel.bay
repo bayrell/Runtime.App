@@ -16,10 +16,10 @@
  *  limitations under the License.
  */
 
-namespace Runtime.Web;
+namespace Runtime.Web.App;
 
 use Runtime.BaseStruct;
-use Runtime.Web.Route;
+use Runtime.Web.App.Route;
 
 
 struct LayoutModel extends BaseStruct
@@ -36,30 +36,22 @@ struct LayoutModel extends BaseStruct
 	Route route = null;
 	Dict<string> route_params = null;
 	
-	/* Layout info */
-	string layout_name = "default";
-	string layout_class = "";
-	string page_class = "";
-	var page_model = null;
-	
 	/* Base SEO Options */
 	string locale = "en";
 	string title = "";
 	string description = "";
 	string tz = "UTC";
 	
-	/* Breadcrumbs */
-	Collection<Dict> breadcrumbs = null;
+	/* Layout info */
+	string layout_name = "default";
+	string layout_class = "";
 	
-	/* Frontend data */
-	Dict<primitive> data = new Dict();
+	/* Current page */
+	string page_class = "";
 	
-	/* Frontend keep data */
-	Dict<primitive> keep_data = new Dict();
+	/* Model by class name */
+	Dict<primitive> model = {};
 	
 	/* CSS params */
-	Dict<primitive> css_vars = new Dict();
-	
-	/* Additional components */
-	Collection<string> components = null;
+	Dict<primitive> css_vars = {};
 }

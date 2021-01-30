@@ -15,32 +15,29 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-
-namespace Runtime.Web;
+ 
+namespace Runtime.Web.App;
 
 use Runtime.BaseStruct;
-use Runtime.Core.Context;
-use Runtime.Core.Driver;
-use Runtime.Core.Entity;
-use Runtime.Core.LambdaChain;
-use Runtime.Web.ExternalBusDriver;
-use Runtime.Web.FrontendStorageDriver;
-use Runtime.Web.Layout;
-use Runtime.Web.LayoutModel;
-use Runtime.Web.RenderDriver;
-use Runtime.Web.RouteController;
-use Runtime.Web.Routes;
+use Runtime.Context;
+use Runtime.Driver;
+use Runtime.Entity;
+use Runtime.LambdaChain;
+use Runtime.LambdaChainClass;
+use Runtime.LambdaChainDeclare;
+use Runtime.Web.App.ExternalBusDriver;
+use Runtime.Web.App.SystemBusDriver;
+use Runtime.Web.App.WebApp;
 
 
 static class ModuleDescription
 {
-
 	
 	/**
 	 * Returns module name
 	 * @return string
 	 */
-	pure string getModuleName() => "Runtime.Web";
+	pure string getModuleName() => "Runtime.Web.App";
 	
 	
 	
@@ -69,115 +66,73 @@ static class ModuleDescription
 	 */
 	pure Collection<Dict> entities() => 
 	[
-		/* Render Driver */
-		new Driver{ "name": classof RenderDriver },
+		new Entity{ "name": classof WebApp },
 		
-		/* Register RouteController */
-		new Driver{ "name": classof RouteController },
+		#ifdef FRONTEND then
 		
-		/* Layout chain */
-		new LambdaChain
-		{
-			"name": RenderDriver::LAYOUT_CHAIN,
-			"pos": 10000,
-			"value": "Runtime.Web.RenderDriver::layoutChainDefault",
-		},
+		/* Register external bus driver */
+		new Driver{ "name": "default:external_bus", "value": classof ExternalBusDriver },
 		
-		/* Render Chain. Create layout model */
-		new LambdaChain
-		{
-			"name": RenderDriver::RENDER_CHAIN,
-			"value": "Runtime.Web.RenderDriver::renderChainCreateLayoutModel",
-			"pos": RenderDriver::RENDER_CHAIN_CREATE_LAYOUT_MODEL,
-		},
+		#endif
 		
-		/* Render Chain. Call middleware route */
-		new LambdaChain
-		{
-			"name": RenderDriver::RENDER_CHAIN,
-			"value": "Runtime.Web.RenderDriver::renderChainCallRouteMiddleware",
-			"pos": RenderDriver::RENDER_CHAIN_CALL_ROUTE_MIDDLEWARE,
-			"is_async": true,
-		},
 		
-		/* Render Chain. Call route */
-		new LambdaChain
-		{
-			"name": RenderDriver::RENDER_CHAIN,
-			"value": "Runtime.Web.RenderDriver::renderChainCallRoute",
-			"pos": RenderDriver::RENDER_CHAIN_CALL_ROUTE,
-			"is_async": true,
-		},
+		#ifdef BACKEND then
 		
 		/* Extend entities */
 		new LambdaChain
 		{
 			"name": "Runtime.Entities",
-			"value": "Runtime.Web.ModuleDescription::extendEntities",
+			"value": "Runtime.Web.App.ModuleDescription::extendEntities",
 		},
-		
-		
-		#ifdef BACKEND then
-		
-		/* Render Chain. Set enviroments */
-		new LambdaChain
-		{
-			"name": RenderDriver::RENDER_CHAIN,
-			"value": "Runtime.Web.RenderDriver::renderChainSetFrontendEnv",
-			"pos": RenderDriver::RENDER_CHAIN_SET_FRONTEND_ENVIROMENTS,
-		},
-		
-		/* Render Chain. Pattern */
-		new LambdaChain
-		{
-			"name": RenderDriver::RENDER_CHAIN,
-			"value": "Runtime.Web.RenderDriver::renderChainPatternDefault",
-			"pos": RenderDriver::RENDER_CHAIN_RESPONSE - 1,
-		},
-		
-		/* Render Chain. Response */
-		new LambdaChain
-		{
-			"name": RenderDriver::RENDER_CHAIN,
-			"value": "Runtime.Web.RenderDriver::renderChainCreateResponse",
-			"pos": RenderDriver::RENDER_CHAIN_RESPONSE,
-		},
-		
-		#endif
-		
-		
-		
-		#ifdef ES6 then
-		
-		/* Register external bus driver */
-		new Driver{ "name": "default:external_bus", "value": classof ExternalBusDriver },
-		
-		/* Storage Driver */
-		new Driver{ "name": classof FrontendStorageDriver },
 		
 		#endif
 	];
 	
 	
 	
+	#ifdef BACKEND then
 	/**
 	 * Extend entities
 	 */
 	pure Collection<BaseStruct> extendEntities(Context c, Collection<BaseStruct> entities)
 	{
-		#ifdef BACKEND then
+		bool api = c |> "Runtime.Web.App", "api" |> default bool true;
+		string external_bus_class = c |> "Runtime.Web.App", "external_bus_class" |> default string "";
+		bool external_bus_default = c |> "Runtime.Web.App", "external_bus_default" |> default bool true;
+		string system_bus_class = c |> "Runtime.Web.App", "system_bus_class" |> default string "";
+		bool system_bus_default = c |> "Runtime.Web.App", "system_bus_default" |> default bool true;
 		
-		bool api = c |> "Runtime.Backend", "api" |> default bool true;
-		
-		/* Enable api service */
-		if (api)
+		/* Set external default bus */
+		if (external_bus_class == "" and external_bus_default)
 		{
-			entities = entities.prependIm( new Entity{ "name": "Runtime.Web.Routes" } );
+			external_bus_class = classof ExternalBusDriver;
 		}
 		
-		#endif
+		/* Enable local bus provider */
+		if (external_bus_class != "")
+		{
+			entities = entities.prependIm
+			(
+				new Driver{ "name": "external_bus", "value": external_bus_class }
+			);
+		}
+		
+		/* Set system default bus */
+		if (system_bus_class == "" and system_bus_default)
+		{
+			system_bus_class = classof SystemBusDriver;
+		}
+		
+		/* Enable local bus provider */
+		if (system_bus_class != "")
+		{
+			entities = entities.prependIm
+			(
+				new Driver{ "name": "system_bus", "value": system_bus_class }
+			);
+		}
 		
 		return [c, entities];
 	}
-	
+	#endif
 }

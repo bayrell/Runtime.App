@@ -16,10 +16,11 @@
  *  limitations under the License.
  */
  
-namespace Runtime.Web;
+namespace Runtime.Web.App;
 
 use Runtime.re;
 use Runtime.BaseStruct;
+use Runtime.Entity;
 
 
 struct Route extends BaseStruct
@@ -32,6 +33,19 @@ struct Route extends BaseStruct
 	public Collection<string> params = null;
 	
 	
+	/**
+	 * Extend route
+	 */
+	Route addClassItem(string class_name, string class_method_name, Entity class_item)
+	{
+		return this.copy
+		{
+			"class_name": class_name,
+			"class_method_name": class_method_name,
+		};
+	}
+	
+	
 	
 	/**
 	 * Init struct data
@@ -41,11 +55,10 @@ struct Route extends BaseStruct
 		string uri = static::_initDataGet(old, changed, "uri");
 		string uri_match = static::_initDataGet(old, changed, "uri_match");
 		
-		if (uri_match == "")
+		if (rtl::isEmpty(uri_match))
 		{
 			string uri_match = uri;
 			uri_match = re::replace("\\/", "\\/", uri_match);
-			
 			Vector<string> params = new Vector();
 			Collection matches = re::matchAll("{(.*?)}", uri);
 			if (matches)

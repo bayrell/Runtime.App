@@ -16,18 +16,18 @@
  *  limitations under the License.
  */
 
-namespace Runtime.Web;
+namespace Runtime.Web.App;
 
 use Runtime.BaseStruct;
-use Runtime.Core.Cookie;
-use Runtime.Core.Message;
-use Runtime.Core.RemoteCallAnswer;
-use Runtime.Core.RemoteCallRequest;
-use Runtime.Core.Request;
-use Runtime.Core.Response;
-use Runtime.Web.LayoutModel;
-use Runtime.Web.RenderDriver;
-use Runtime.Web.Route;
+use Runtime.Web.Message;
+use Runtime.Web.App.Cookie;
+use Runtime.Web.App.LayoutModel;
+use Runtime.Web.App.RemoteCallAnswer;
+use Runtime.Web.App.RemoteCallRequest;
+use Runtime.Web.App.Request;
+use Runtime.Web.App.Response;
+use Runtime.Web.App.Route;
+use Runtime.Web.App.WebApp;
 
 
 struct RenderContainer extends BaseStruct
@@ -38,21 +38,15 @@ struct RenderContainer extends BaseStruct
 	Dict<string> route_params = null;
 	LayoutModel layout = null;
 	
-	/* Frontend settings */
-	Dict<primitive> frontend_storage = new Dict();
-	Dict<primitive> frontend_env = new Dict();
+	/* Pattern settings */
 	string pattern_name = "default";
 	string pattern_class = "";
-
-	/* Main RenderController */
-	string frontend_controller_name = "";
 	
-	/* Backend */
+	/* Backend settings */
 	Dict<primitive> api_storage = new Dict();
 	Dict<Cookie> new_cookies = {};
 	Collection<string> new_headers = [];
 	int new_http_code = 200;
-	
 	
 	/* Functions */
 	bool isRequestExists() => this.request != null;
@@ -62,6 +56,29 @@ struct RenderContainer extends BaseStruct
 		this.route.class_name != "" and this.route.class_method_name != ""
 	;
 	bool isPageExists() => this.layout != null and this.layout.page_class != "";
+	
+	
+	
+	/**
+	 * Set page
+	 */
+	RenderContainer setPage(string page_class, primitive page_model)
+	{
+		Dict model = this.layout.model;
+		if (model == null) model = {};
+		
+		/* Set page model */
+		model = model.setIm(page_class, page_model);
+		
+		return this.copy
+		{
+			"layout": this.layout.copy
+			{
+				"page_class": page_class,
+				"model": model,
+			}
+		};
+	}
 	
 	
 	
@@ -79,6 +96,6 @@ struct RenderContainer extends BaseStruct
 		};
 		
 		/* Send request */
-		return await RenderDriver::externalBusCall(items);
+		return await WebApp::externalBusCall(items);
 	}
 }

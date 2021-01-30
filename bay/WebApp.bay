@@ -1,0 +1,548 @@
+/*!
+ *  Bayrell Runtime Library
+ *
+ *  (c) Copyright 2016-2020 "Ildar Bikmamatov" <support@bayrell.org>
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+ 
+namespace Runtime.Web.App;
+
+use Runtime.re;
+use Runtime.rs;
+use Runtime.lib;
+use Runtime.BaseDriver;
+use Runtime.BaseStruct;
+use Runtime.Context;
+use Runtime.LambdaChain;
+use Runtime.LambdaChainClass;
+use Runtime.Web.RenderDriver;
+use Runtime.Web.App.LayoutModel;
+use Runtime.Web.App.RenderContainer;
+use Runtime.Web.App.Request;
+use Runtime.Web.App.Response;
+use Runtime.Web.App.Route;
+use Runtime.Web.App.RouteList;
+use Runtime.Web.App.RouteMiddleware;
+
+
+@LambdaChainClass{}
+class WebApp extends BaseDriver
+{
+	/* Chains */
+	static const string LAYOUT_CHAIN = "Runtime.Web.App.Layout";
+	static const string PATTERN_CHAIN = "Runtime.Web.App.Pattern";
+	static const string RENDER_CHAIN = "Runtime.Web.App.Render";
+	static const string TITLE_CHAIN = "Runtime.Web.App.Title";
+	static const string CSS_VARS_CHAIN = "Runtime.Web.App.CSS_VARS";
+	
+	
+	/* Render Chain */
+	static const int RENDER_CHAIN_START = 500;
+	static const int RENDER_CHAIN_CREATE_LAYOUT_MODEL = 950;
+	static const int RENDER_CHAIN_CHANGE_LAYOUT_MODEL = 1000;
+	static const int RENDER_CHAIN_SET_FRONTEND_ENVIROMENTS = 1500;
+	static const int RENDER_CHAIN_SET_FRONTEND_STORAGE = 1500;
+	static const int RENDER_CHAIN_CALL_ROUTE_BEFORE = 2000;
+	static const int RENDER_CHAIN_CALL_ROUTE_MIDDLEWARE = 2500;
+	static const int RENDER_CHAIN_CALL_ROUTE = 3000;
+	static const int RENDER_CHAIN_CALL_PAGE_NOT_FOUND = 3100;
+	static const int RENDER_CHAIN_CALL_ROUTE_AFTER = 3500;
+	static const int RENDER_CHAIN_RESPONSE_BEFORE = 4000;
+	static const int RENDER_CHAIN_RESPONSE = 4500;
+	static const int RENDER_CHAIN_RESPONSE_AFTER = 5000;
+	
+	
+	/* Variables */
+	Collection<Route> routes = null;
+	
+	
+	
+	/**
+	 * Init app
+	 */
+	static Context appInit(Context c)
+	{
+		return c::appInit(c);
+	}
+	
+	
+	
+	/**
+	 * Start app
+	 */
+	static async Context appStart(Context c)
+	{
+		return await c::appStart(c);
+	}
+	
+	
+	
+	/**
+	 * Start driver
+	 */
+	public async void startDriver()
+	{
+		await parent::startDriver();
+		
+		/* Get routes */
+		this.routes = Context::getSubEntities(@.entities, classof RouteList, classof Route);
+	}
+	
+	
+	
+	/**
+	 * Render request
+	 */
+	async RenderContainer renderRequest(Request request)
+	{
+		Route route = null;
+		Dict<string> params = null;
+		
+		/* Search route */
+		list res = this.findRoute(request);
+		route = res.item(0); params = res.item(1);
+		
+		/* Create render container  */
+		RenderContainer container = new RenderContainer
+		{
+			"request": request,
+			"route": route,
+			"route_params": params,
+		};
+		
+		/* Render container */
+		container = await static::callRenderChain(container);
+		
+		/* Result */
+		return container;
+	}
+	
+	
+	
+	/**
+	 * Find route
+	 */
+	list<string, string> findRoute(Request request)
+	{
+		Route route = null;
+		Dict<string> params = null;
+		
+		string request_uri = request.uri;
+		string route_prefix = request.route_prefix;
+		
+		request_uri = static::splitRoutePrefix(request_uri, route_prefix);
+		if (request_uri === null) return [route, params];
+		
+		/* Find route */
+		for (int i=0; i<this.routes.count(); i++)
+		{
+			Route info = this.routes.item(i);
+			Collection<string> matches = re::matchAll( info.uri_match, request_uri );
+			if (matches != null)
+			{
+				matches = matches.get(0, null);
+				if (matches) matches = matches.removeFirstIm();
+				params = info::getParams(matches, info);
+				route = info;
+				break;
+			}
+		}
+		
+		return [route, params];
+	}
+	
+	
+	
+	/**
+	 * Split route prefix
+	 */
+	pure memorize string splitRoutePrefix(string request_uri, string route_prefix)
+	{
+		int prefix_len = rs::strlen(route_prefix);
+		if (prefix_len > 0)
+		{
+			int pos = rs::search(request_uri, route_prefix);
+			if (pos == -1)
+			{
+				return null;
+			}
+			request_uri = rs::substr(request_uri, prefix_len);
+		}
+		if (request_uri == "") request_uri = "/";
+		return request_uri;
+	}
+	
+	
+	
+	/**
+	 * Returns middlewares
+	 */
+	pure memorize Collection<BaseStruct> getMiddlewares
+	(string class_name, string method_name, string middleware_class_name)
+	{
+		Collection<BaseStruct> middlewares = [];
+		
+		/* Get middleware from class */
+		Dict info = rtl::methodApply(class_name, "getClassInfo");
+		middlewares = middlewares.concatIm
+		(
+			info["annotations"].filter( lib::isInstance(middleware_class_name) )
+		)
+		
+		/* Get middleware from method */
+		Dict info = rtl::methodApply
+		(
+			class_name, "getMethodInfoByName", [method_name]
+		);
+		middlewares = middlewares.concatIm
+		(
+			info["annotations"].filter( lib::isInstance(middleware_class_name) )
+		);
+		
+		return middlewares;
+	}
+	
+	
+	
+	/**
+	 * Render chain
+	 * Create layout model
+	 */
+	@LambdaChain
+	{
+		"name": static::CSS_VARS_CHAIN,
+		"pos": 0,
+	}
+	static RenderContainer cssVarsChain(Dict css_vars)
+	{
+		css_vars <= colors <= new Dict
+		{
+			"default":
+			{
+				"color": "#fff",
+				"background": "#fff",
+				"border": "#ccc",
+				"text": "#000",
+				"hover-background": "#eee",
+				"hover-text": "inherit",
+			},
+			
+			"active":
+			{
+				"color": "#337ab7",
+				"background": "#337ab7",
+				"border": "#22527b",
+				"text": "#fff",
+				"hover-background": "#337ab7",
+				"hover-text": "#fff",
+			},
+			
+			"primary":
+			{
+				"color": "#337ab7",
+				"background": "#337ab7",
+				"border": "#22527b",
+				"text": "#fff",
+				"hover-background": "#286090",
+				"hover-text": "#fff",
+				"active-background": "#286090",
+				"active-tet": "#fff",
+			},
+			
+			"danger":
+			{
+				"color": "#d14b42",
+				"background": "#d14b42",
+				"border": "#a02e27",
+				"text": "#fff",
+				"hover-background": "#e60000",
+				"hover-text": "#fff",
+				"active-background": "#e60000",
+				"active-tet": "#fff",
+			},
+			
+			"success":
+			{
+				"color": "green",
+				"background": "green",
+				"border": "green",
+				"text": "#fff",
+				"hover": "green",
+				"hover-text": "#fff",
+				"active": "green",
+				"active-tet": "#fff",
+			},
+			
+			"error":
+			{
+				"color": "#d14b42",
+				"background": "#d14b42",
+				"border": "#a02e27",
+				"text": "#fff",
+				"hover-background": "#e60000",
+				"hover-text": "#fff",
+				"active-background": "#e60000",
+				"active-tet": "#fff",
+			},
+			
+			"warning":
+			{
+				"color": "yellow",
+				"background": "yellow",
+				"border": "yellow",
+				"text": "#fff",
+				"hover": "yellow",
+				"hover-text": "#fff",
+				"active": "yellow",
+				"active-tet": "#fff",
+			},
+		};
+		
+		css_vars <= font <= new Dict
+		{
+			"size": "14px",
+		};
+		
+		return [ css_vars ];
+	}
+	
+	
+	
+	/**
+	 * Render chain
+	 * Create layout model
+	 */
+	@LambdaChain
+	{
+		"name": static::RENDER_CHAIN,
+		"pos": static::RENDER_CHAIN_CREATE_LAYOUT_MODEL,
+	}
+	static RenderContainer renderChain_CreateLayoutModel(RenderContainer container)
+	{
+		if (container == null) return [ container ];
+		if (container.isResponseExists()) return [ container ];
+		
+		Dict css_vars = static::callCssVarsChain({});
+		
+		/* Create LayoutModel */
+		container <= layout <= new LayoutModel
+		{
+			"uri": static::splitRoutePrefix(container.request.uri, container.request.route_prefix),
+			"f_inc": @.config(["Runtime.Web.App", "f_inc"], "1"),
+			"full_uri": container.request.uri,
+			"route": container.route,
+			"route_prefix": container.request.route_prefix,
+			"route_params": container.route_params,
+			"css_vars": css_vars,
+		};
+		
+		return [ container ];
+	}
+	
+	
+	
+	/**
+	 * Render chain
+	 * Call route middlewares
+	 */
+	@LambdaChain
+	{
+		"name": static::RENDER_CHAIN,
+		"pos": static::RENDER_CHAIN_CALL_ROUTE_MIDDLEWARE,
+	}
+	static async RenderContainer renderChain_CallRouteMiddleware(RenderContainer container)
+	{
+		if (container == null) return [ container ];
+		if (container.isResponseExists()) return [ container ];
+		if (container.isPageExists()) return [ container ];
+		if (not container.isRouteExists()) return [ container ];
+		
+		/* Get middleware from class */
+		Collection<RouteMiddleware> middlewares = static::getMiddlewares
+		(
+			container.route.class_name,
+			container.route.class_method_name,
+			classof RouteMiddleware
+		);
+		
+		/* Run each middleware */
+		for (int i=0; i<middlewares.count(i); i++)
+		{
+			RouteMiddleware m = middlewares.item(i);
+			Collection arr = rs::split("::", m.value);
+			string class_name = arr.get(0, "");
+			string method_name = arr.get(1, "");
+			fn f = rtl::method(class_name, method_name);
+			
+			/* Run method */
+			list res = await f(container);
+			container = res[0];
+		}
+		
+		return [ container ];
+	}
+	
+	
+	
+	/**
+	 * Render chain
+	 * Call route
+	 */
+	@LambdaChain
+	{
+		"name": static::RENDER_CHAIN,
+		"pos": static::RENDER_CHAIN_CALL_ROUTE,
+		"is_async": true,
+	}
+	static async RenderContainer renderChain_CallRoute(RenderContainer container)
+	{
+		if (container == null) return [ container ];
+		if (container.isResponseExists()) return [ container ];
+		if (container.isPageExists()) return [ container ];
+		if (not container.isRouteExists()) return [ container ];
+		
+		container = await rtl::methodApplyAsync
+		(
+			container.route.class_name,
+			container.route.class_method_name,
+			[ container ]
+		) |> attr 0;
+		
+		return [ container ];
+	}
+	
+	
+	
+	#ifdef BACKEND then
+	
+	/**
+	 * Render chain. Set frontend enviroments
+	 */
+	@LambdaChain
+	{
+		"name": static::RENDER_CHAIN,
+		"pos": static::RENDER_CHAIN_SET_FRONTEND_ENVIROMENTS,
+	}
+	pure RenderContainer renderChain_SetFrontendEnv(RenderContainer container)
+	{
+		/*container <= frontend_env <= "APP_MODE" <= @.env("APP_MODE", "prod");
+		container <= frontend_env <= "X-APP-HASH" <= RenderDriver::getCssHash(@.main_class);
+		container <= frontend_env <= "X-ROUTE-PREFIX" <= @.env("X-ROUTE-PREFIX", "");*/
+		return [ container ];
+	}
+	
+	
+	
+	/**
+	 * Render chain
+	 * Create layout model
+	 */
+	@LambdaChain
+	{
+		"name": static::RENDER_CHAIN,
+		"pos": static::RENDER_CHAIN_RESPONSE,
+	}
+	static RenderContainer renderChain_CreateResponse(RenderContainer container)
+	{
+		if (container == null) return [ container ];
+		if (container.isResponseExists()) return [ container ];
+		
+		/* Get params */
+		LayoutModel layout = static::callLayoutChain(container.layout);
+		Dict params = {};
+		
+		/* Render layout */
+		fn render = rtl::method(layout.layout_class, "render");
+		string layout_content = render(layout, layout, {}, null);
+		
+		/* Render pattern */
+		fn render = rtl::method(container.pattern_class, "render");
+		string patter_content = render(container, layout, params, layout_content);
+		
+		/* Create response */
+		container <= response <= new Response
+		{
+			"content": patter_content,
+			"headers": container.new_headers,
+			"http_code": container.new_http_code,
+		};
+		
+		return [ container ];
+	}
+	
+	
+	#endif
+	
+	
+	
+	/**
+	 * Render chain
+	 */
+	static async RenderContainer callRenderChain(RenderContainer container)
+	{
+		container = await @.chainAsync(static::RENDER_CHAIN, [container]) |> attr 0;
+		return container;
+	}
+	
+	
+	
+	/**
+	 * Returns title
+	 */
+	pure string callTitleChain(LayoutModel layout, string title)
+	{
+		title = @.chain(static::TITLE_CHAIN, [layout, title]) |> attr 1;
+		return title;
+	}
+	
+	
+	
+	/**
+	 * Layout chain
+	 */
+	pure LayoutModel callLayoutChain(LayoutModel layout)
+	{
+		layout = @.chain(static::LAYOUT_CHAIN, [layout]) |> attr 0;
+		return layout;
+	}
+	
+	
+	
+	/**
+	 * CSS vars chain
+	 */
+	pure Dict callCssVarsChain(Dict css_vars)
+	{
+		css_vars = @.chain(static::CSS_VARS_CHAIN, [css_vars]) |> attr 0;
+		return css_vars;
+	}
+	
+	
+	
+	/**
+	 * Returns layout CSS
+	 */
+	pure string getLayoutCSS(LayoutModel layout)
+	{
+		Collection components =
+		[
+			layout.layout_class,
+			layout.page_class,
+		];
+		components = @.chain(RenderDriver::COMPONENTS_CHAIN, [ components ]) |> attr 0;
+		string css = RenderDriver::getCSSFromComponents(components, layout.css_vars);
+		css = @.chain(RenderDriver::CSS_CHAIN, [css]) |> attr 0;
+		return css;
+	}
+}

@@ -16,12 +16,8 @@
  *  limitations under the License.
  */
  
-namespace Runtime.Core;
+namespace Runtime.Web.App;
 
-use Runtime.CoreObject;
-use Runtime.RuntimeUtils;
-use Runtime.Core.Request;
-use Runtime.Core.Response;
 
 
 struct JsonResponse extends Response

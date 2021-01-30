@@ -2,5 +2,23 @@
 	"name": "Runtime.Web.App",
 	"assets":
 	[
+		"ApiList",
+		"ApiMethod",
+		"ApiMiddleware",
+		"ApiMiddleware",
+		"Cookie",
+		"ExternalBusDriver",
+		"LayoutModel",
+		"RemoteCallAnswer",
+		"RemoteCallRequest",
+		"RenderContainer",
+		"Request",
+		"Route",
+		"RouteList",
+		"RouteMiddleware",
+		"Routes",
+		"SeoModel",
+		"WebApp",
+		"ModuleDescription"
 	]
 }

@@ -16,10 +16,10 @@
  *  limitations under the License.
  */
  
-namespace Runtime.Core;
+namespace Runtime.Web.App;
 
 use Runtime.BaseStruct;
-use Runtime.Core.Cookie;
+use Runtime.Web.App.Cookie;
 
 
 struct Request extends BaseStruct
