@@ -18,6 +18,7 @@
  
 namespace Runtime.Web.App;
 
+use Runtime.BaseStruct;
 
 
 struct RemoteCallAnswer extends BaseStruct

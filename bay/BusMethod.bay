@@ -18,7 +18,7 @@
  
 namespace Runtime.Web.App;
 
-
+use Runtime.BaseStruct;
 
 
 struct BusMethod extends BaseStruct

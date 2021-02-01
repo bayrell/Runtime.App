@@ -18,6 +18,14 @@
 
 namespace Runtime.Web.App;
 
+use Runtime.Exceptions.ApiException;
+use Runtime.Exceptions.FileNotFound;
+use Runtime.Web.App.JsonResponse;
+use Runtime.Web.App.RemoteCallAnswer;
+use Runtime.Web.App.RemoteCallRequest;
+use Runtime.Web.App.RenderContainer;
+use Runtime.Web.App.Route;
+use Runtime.Web.App.RouteList;
 
 
 @RouteList{}
@@ -60,11 +68,11 @@ static class Routes
 		{
 			/* Decode data */
 			string data1 = container.request.payload.get("data", "");
-			var data = RuntimeUtils::json_decode(data1);
+			var data = rtl::json_decode(data1);
 			
 			/* Decode storage */
 			string storage1 = container.request.payload.get("storage", "");
-			var storage = RuntimeUtils::json_decode(storage1);
+			var storage = rtl::json_decode(storage1);
 			
 			/* Get time and sign */
 			string sign = container.request.payload.get("sign", "") |> default string "";

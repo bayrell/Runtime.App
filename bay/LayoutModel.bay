@@ -51,7 +51,4 @@ struct LayoutModel extends BaseStruct
 	
 	/* Model by class name */
 	Dict<primitive> model = {};
-	
-	/* CSS params */
-	Dict<primitive> css_vars = {};
 }

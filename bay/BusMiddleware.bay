@@ -18,9 +18,10 @@
  
 namespace Runtime.Web.App;
 
+use Runtime.BaseStruct;
 
 
-struct BusMiddleware extends Message
+struct BusMiddleware extends BaseStruct
 {
 	string value = "";
 }

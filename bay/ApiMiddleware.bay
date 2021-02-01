@@ -18,9 +18,10 @@
  
 namespace Runtime.Web.App;
 
+use Runtime.BaseStruct;
 
 
-struct ApiMiddleware extends Message
+struct ApiMiddleware extends BaseStruct
 {
 	string value = "";
 }

@@ -18,6 +18,7 @@
  
 namespace Runtime.Web.App;
 
+use Runtime.Web.App.Response;
 
 
 struct JsonResponse extends Response

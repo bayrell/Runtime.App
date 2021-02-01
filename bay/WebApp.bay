@@ -44,7 +44,6 @@ class WebApp extends BaseDriver
 	static const string PATTERN_CHAIN = "Runtime.Web.App.Pattern";
 	static const string RENDER_CHAIN = "Runtime.Web.App.Render";
 	static const string TITLE_CHAIN = "Runtime.Web.App.Title";
-	static const string CSS_VARS_CHAIN = "Runtime.Web.App.CSS_VARS";
 	
 	
 	/* Render Chain */
@@ -65,7 +64,8 @@ class WebApp extends BaseDriver
 	
 	/* Variables */
 	Collection<Route> routes = null;
-	
+	Vector history = new Vector();
+	string route_prefix = "";
 	
 	
 	/**
@@ -97,6 +97,18 @@ class WebApp extends BaseDriver
 		
 		/* Get routes */
 		this.routes = Context::getSubEntities(@.entities, classof RouteList, classof Route);
+		this.route_prefix = @.env("X-ROUTE-PREFIX", "");
+		
+		#ifcode ES6 then
+		
+		/* Add mouse listener */
+		var body = document.getElementsByTagName("body")[0];
+		body.addEventListener("click", Runtime.Web.App.WebApp.js_click);
+		
+		/* Add history listener */
+		window.onpopstate = Runtime.Web.App.WebApp.js_onpopstate;
+		
+		#endif
 	}
 	
 	
@@ -138,12 +150,15 @@ class WebApp extends BaseDriver
 		list res = this.findRoute(request);
 		route = res.item(0); params = res.item(1);
 		
+		RenderDriver render = @.getDriver("RenderDriver");
+		
 		/* Create render container  */
 		RenderContainer container = new RenderContainer
 		{
 			"request": request,
 			"route": route,
 			"route_params": params,
+			"layout": (render != null) ? render.layout : null,
 		};
 		
 		/* Render container */
@@ -185,6 +200,141 @@ class WebApp extends BaseDriver
 		}
 		
 		return [route, params];
+	}
+	
+	
+	
+	/**
+	 * Open url
+	 */
+	public async void openUrl(string href = "/")
+	{
+		#ifcode JAVASCRIPT then
+		var obj = { "href": href, };
+		history.pushState(obj, "", href);
+		#endif
+		this.history.pushValue(href);
+		await this.renderPage(href);
+	}
+	
+	
+	
+	/**
+	 * Render page
+	 */
+	public async void renderPage(string url = "/")
+	{
+		string host = "";
+		string method = "";
+		string protocol = "";
+		
+		#ifcode ES6 then
+		host = window.location.hostname;
+		protocol = window.location.protocol.substr(0, window.location.protocol.length - 1);
+		#endif
+		
+		int pos = rs::strpos(url, "?");
+		string uri = (pos >= 0) ? rs::substr(url, 0, pos) : url;
+		string get = (pos >= 0) ? rs::substr(url, pos + 1) : "";
+		Dict<string> query = new Map();
+		
+		if (get != "")
+		{
+			Collection arr = rs::explode("&", get);
+			arr.each
+			(
+				void (string s) use (query)
+				{
+					Collection arr = rs::explode("=", s);
+					string key = arr[0];
+					string value = arr[1];
+					query.set(key, value);
+				}
+			);
+		}
+		
+		Request request = new Request
+		{
+			"uri": uri,
+			"host": host,
+			"protocol": protocol,
+			"query": query.toDict(),
+			"route_prefix": this.route_prefix,
+		};
+		
+		/* Render request */
+		RenderContainer container = await this.renderRequest(request);
+		
+		/* Render container */
+		@.getDriver("RenderDriver")
+			.setLayout(container.layout)
+			.repaint()
+		;
+	}
+	
+	
+	
+	/**
+	 * JS Click Event
+	 */
+	public static void @js_click(var e)
+	{
+		@ = rtl::getContext();
+		WebApp web_app = @.getDriver("WebApp");
+		
+		#ifcode JAVASCRIPT then
+		var elem = e.target;
+		
+		if (elem.tagName == "A")
+		{
+			var target = elem.getAttribute("target");
+			var href = elem.getAttribute("href");
+			if (target == null)
+			{
+				e.preventDefault();
+				(async () => {
+					try { await web_app.openUrl(ctx, href); }
+					catch (e) { console.log(e.stack); }
+				})();
+				return false;
+			}
+		}
+		
+		#endif
+	}
+	
+	
+	
+	/**
+	 * JS onpopstate event
+	 */
+	public static void @js_onpopstate(var e)
+	{
+		@ = rtl::getContext();
+		WebApp web_app = @.getDriver("WebApp");
+		
+		#ifcode JAVASCRIPT then
+		if (web_app.history.count() == 0)
+		{
+			document.location = document.location;
+		}
+		else if (e.state != null && typeof e.state.href == "string")
+		{
+			web_app.history.pop(ctx);
+			(async () => {
+				try { await web_app.renderPage(ctx, e.state.href); }
+				catch (e) { console.log(e.stack); }
+			})();
+		}
+		else
+		{
+			web_app.history.pop(ctx);
+			(async () => {
+				try { await web_app.renderPage(ctx, "/"); }
+				catch (e) { console.log(e.stack); }
+			})();
+		}
+		#endif
 	}
 	
 	
@@ -246,110 +396,6 @@ class WebApp extends BaseDriver
 	 */
 	@LambdaChain
 	{
-		"name": static::CSS_VARS_CHAIN,
-		"pos": 0,
-	}
-	static RenderContainer cssVarsChain(Dict css_vars)
-	{
-		css_vars <= colors <= new Dict
-		{
-			"default":
-			{
-				"color": "#fff",
-				"background": "#fff",
-				"border": "#ccc",
-				"text": "#000",
-				"hover-background": "#eee",
-				"hover-text": "inherit",
-			},
-			
-			"active":
-			{
-				"color": "#337ab7",
-				"background": "#337ab7",
-				"border": "#22527b",
-				"text": "#fff",
-				"hover-background": "#337ab7",
-				"hover-text": "#fff",
-			},
-			
-			"primary":
-			{
-				"color": "#337ab7",
-				"background": "#337ab7",
-				"border": "#22527b",
-				"text": "#fff",
-				"hover-background": "#286090",
-				"hover-text": "#fff",
-				"active-background": "#286090",
-				"active-tet": "#fff",
-			},
-			
-			"danger":
-			{
-				"color": "#d14b42",
-				"background": "#d14b42",
-				"border": "#a02e27",
-				"text": "#fff",
-				"hover-background": "#e60000",
-				"hover-text": "#fff",
-				"active-background": "#e60000",
-				"active-tet": "#fff",
-			},
-			
-			"success":
-			{
-				"color": "green",
-				"background": "green",
-				"border": "green",
-				"text": "#fff",
-				"hover": "green",
-				"hover-text": "#fff",
-				"active": "green",
-				"active-tet": "#fff",
-			},
-			
-			"error":
-			{
-				"color": "#d14b42",
-				"background": "#d14b42",
-				"border": "#a02e27",
-				"text": "#fff",
-				"hover-background": "#e60000",
-				"hover-text": "#fff",
-				"active-background": "#e60000",
-				"active-tet": "#fff",
-			},
-			
-			"warning":
-			{
-				"color": "yellow",
-				"background": "yellow",
-				"border": "yellow",
-				"text": "#fff",
-				"hover": "yellow",
-				"hover-text": "#fff",
-				"active": "yellow",
-				"active-tet": "#fff",
-			},
-		};
-		
-		css_vars <= font <= new Dict
-		{
-			"size": "14px",
-		};
-		
-		return [ css_vars ];
-	}
-	
-	
-	
-	/**
-	 * Render chain
-	 * Create layout model
-	 */
-	@LambdaChain
-	{
 		"name": static::RENDER_CHAIN,
 		"pos": static::RENDER_CHAIN_CREATE_LAYOUT_MODEL,
 	}
@@ -357,8 +403,6 @@ class WebApp extends BaseDriver
 	{
 		if (container == null) return [ container ];
 		if (container.isResponseExists()) return [ container ];
-		
-		Dict css_vars = static::callCssVarsChain({});
 		
 		/* Create LayoutModel */
 		container <= layout <= new LayoutModel
@@ -369,7 +413,7 @@ class WebApp extends BaseDriver
 			"route": container.route,
 			"route_prefix": container.request.route_prefix,
 			"route_params": container.route_params,
-			"css_vars": css_vars,
+			"model": container.layout.model,
 		};
 		
 		return [ container ];
@@ -385,6 +429,7 @@ class WebApp extends BaseDriver
 	{
 		"name": static::RENDER_CHAIN,
 		"pos": static::RENDER_CHAIN_CALL_ROUTE_MIDDLEWARE,
+		"is_async": true,
 	}
 	static async RenderContainer renderChain_CallRouteMiddleware(RenderContainer container)
 	{
@@ -461,9 +506,9 @@ class WebApp extends BaseDriver
 	}
 	pure RenderContainer renderChain_SetFrontendEnv(RenderContainer container)
 	{
-		/*container <= frontend_env <= "APP_MODE" <= @.env("APP_MODE", "prod");
-		container <= frontend_env <= "X-APP-HASH" <= RenderDriver::getCssHash(@.main_class);
-		container <= frontend_env <= "X-ROUTE-PREFIX" <= @.env("X-ROUTE-PREFIX", "");*/
+		container <= frontend_env <= "APP_MODE" <= @.env("APP_MODE", "prod");
+		container <= frontend_env <= "X-APP-HASH" <= RenderDriver::hash(@.main_class);
+		container <= frontend_env <= "X-ROUTE-PREFIX" <= @.env("X-ROUTE-PREFIX", "");
 		return [ container ];
 	}
 	
@@ -545,17 +590,6 @@ class WebApp extends BaseDriver
 	
 	
 	/**
-	 * CSS vars chain
-	 */
-	pure Dict callCssVarsChain(Dict css_vars)
-	{
-		css_vars = @.chain(static::CSS_VARS_CHAIN, [css_vars]) |> attr 0;
-		return css_vars;
-	}
-	
-	
-	
-	/**
 	 * Returns layout CSS
 	 */
 	pure string getLayoutCSS(LayoutModel layout)
@@ -566,7 +600,8 @@ class WebApp extends BaseDriver
 			layout.page_class,
 		];
 		components = @.chain(RenderDriver::COMPONENTS_CHAIN, [ components ]) |> attr 0;
-		string css = RenderDriver::getCSSFromComponents(components, layout.css_vars);
+		Dict css_vars = RenderDriver::callCssVarsChain({});
+		string css = RenderDriver::getCSSFromComponents(components, css_vars);
 		css = @.chain(RenderDriver::CSS_CHAIN, [css]) |> attr 0;
 		return css;
 	}

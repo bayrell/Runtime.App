@@ -42,6 +42,9 @@ struct RenderContainer extends BaseStruct
 	string pattern_name = "default";
 	string pattern_class = "";
 	
+	/* Frontend settings */
+	Dict frontend_env = {};
+	
 	/* Backend settings */
 	Dict<primitive> api_storage = new Dict();
 	Dict<Cookie> new_cookies = {};
