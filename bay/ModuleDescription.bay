@@ -71,12 +71,14 @@ static class ModuleDescription
 		#ifdef FRONTEND then
 		
 		/* Register external bus driver */
-		new Driver{ "name": "default:external_bus", "value": classof ExternalBusDriver },
+		new Driver{ "name": "external_bus", "value": classof ExternalBusDriver },
 		
 		#endif
 		
 		
 		#ifdef BACKEND then
+		
+		new Entity{ "name": "Runtime.Web.App.Routes" },
 		
 		/* Extend entities */
 		new LambdaChain

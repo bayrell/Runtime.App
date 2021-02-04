@@ -36,7 +36,7 @@ struct Route extends BaseStruct
 	/**
 	 * Extend route
 	 */
-	Route addClassItem(string class_name, string class_method_name, Entity class_item)
+	Route addClassItem(string class_name, string class_method_name, Entity class_item, Dict info)
 	{
 		return this.copy
 		{

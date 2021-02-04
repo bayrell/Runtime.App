@@ -19,6 +19,7 @@
 namespace Runtime.Web.App;
 
 use Runtime.BaseStruct;
+use Runtime.Web.App.BusList;
 
 
 struct BusMethod extends BaseStruct
@@ -29,4 +30,19 @@ struct BusMethod extends BaseStruct
 	string class_method_name = "";
 	string method_name = "";
 	string uri = "";
+	
+	
+	/**
+	 * Extend
+	 */
+	BusMethod addClassItem(string class_name, string class_method_name, BusList class_item, Dict info)
+	{
+		return this.copy
+		{
+			"object_name": class_item.object_name,
+			"interface_name": class_item.interface_name,
+			"class_name": class_name,
+			"class_method_name": class_method_name,
+		};
+	}
 }

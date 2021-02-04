@@ -45,7 +45,7 @@ struct JsonResponse extends Response
 	 */
 	string getContent()
 	{
-		return RuntimeUtils::json_encode(this.data);
+		return rtl::json_encode(this.data);
 	}
 	
 }

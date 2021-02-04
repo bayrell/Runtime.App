@@ -27,7 +27,10 @@ use Runtime.Context;
 use Runtime.LambdaChain;
 use Runtime.LambdaChainClass;
 use Runtime.Web.RenderDriver;
+use Runtime.Web.App.BusInterface;
 use Runtime.Web.App.LayoutModel;
+use Runtime.Web.App.RemoteCallAnswer;
+use Runtime.Web.App.RemoteCallRequest;
 use Runtime.Web.App.RenderContainer;
 use Runtime.Web.App.Request;
 use Runtime.Web.App.Response;
@@ -44,6 +47,7 @@ class WebApp extends BaseDriver
 	static const string PATTERN_CHAIN = "Runtime.Web.App.Pattern";
 	static const string RENDER_CHAIN = "Runtime.Web.App.Render";
 	static const string TITLE_CHAIN = "Runtime.Web.App.Title";
+	static const string EXTERNAL_BUS_CHAIN = "Runtime.Web.App.ExternalBus";
 	
 	
 	/* Render Chain */
@@ -248,7 +252,8 @@ class WebApp extends BaseDriver
 					Collection arr = rs::explode("=", s);
 					string key = arr[0];
 					string value = arr[1];
-					query.set(key, value);
+					Collection keys = static::getQueryKeys(key);
+					query = rtl::setAttr(query, keys, value);
 				}
 			);
 		}
@@ -270,6 +275,18 @@ class WebApp extends BaseDriver
 			.setLayout(container.layout)
 			.repaint()
 		;
+	}
+	
+	
+	
+	/**
+	 * Get query keys
+	 */
+	pure Collection getQueryKeys(string key)
+	{
+		key = rs::replace("]", "", key);
+		Collection arr = rs::split("\\[", key);
+		return arr;
 	}
 	
 	
@@ -594,15 +611,45 @@ class WebApp extends BaseDriver
 	 */
 	pure string getLayoutCSS(LayoutModel layout)
 	{
-		Collection components =
-		[
-			layout.layout_class,
-			layout.page_class,
-		];
-		components = @.chain(RenderDriver::COMPONENTS_CHAIN, [ components ]) |> attr 0;
-		Dict css_vars = RenderDriver::callCssVarsChain({});
-		string css = RenderDriver::getCSSFromComponents(components, css_vars);
-		css = @.chain(RenderDriver::CSS_CHAIN, [css]) |> attr 0;
+		RenderDriver render = @.getDriver("RenderDriver");
+		
+		/* Get components */
+		Collection components = render.components
+			.concat([layout.layout_class,layout.page_class])
+			.filter(lib::equalNot(""))
+			.removeDuplicatesIm()
+		;
+		
+		/* Returns css from components */
+		string css = render.getCSS(components);
 		return css;
+	}
+	
+	
+	
+	/**
+	 * Remote bus call
+	 * @param Dict items
+	 * @return RemoteCallAnswer
+	 */
+	static async RemoteCallAnswer externalBusCall(Dict items)
+	{
+		/* Set default params */
+		items = items.copy
+		{
+			"app_name": items.get("app_name", "self"),
+			"interface_name": items.get("interface_name", "default"),
+		};
+		
+		/* Change api request */
+		RemoteCallRequest request = new RemoteCallRequest(items);
+		list res = await @.chainAsync(static::EXTERNAL_BUS_CHAIN, [request]);
+		request = res[0] |> default RemoteCallRequest null;
+		
+		/* Send request */
+		BusInterface bus = @.getDriver("external_bus");
+		RemoteCallAnswer answer = await bus.remoteBusCall(request);
+		
+		return answer;
 	}
 }

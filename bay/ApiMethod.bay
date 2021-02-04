@@ -20,6 +20,7 @@ namespace Runtime.Web.App;
 
 use Runtime.BaseStruct;
 use Runtime.Entity;
+use Runtime.Web.App.ApiList;
 
 
 struct ApiMethod extends BaseStruct
@@ -30,4 +31,19 @@ struct ApiMethod extends BaseStruct
 	string class_method_name = "";
 	string method_name = "";
 	string uri = "";
+	
+	
+	/**
+	 * Extend
+	 */
+	ApiMethod addClassItem(string class_name, string class_method_name, ApiList class_item, Dict info)
+	{
+		return this.copy
+		{
+			"object_name": class_item.object_name,
+			"interface_name": class_item.interface_name,
+			"class_name": class_name,
+			"class_method_name": class_method_name,
+		};
+	}
 }

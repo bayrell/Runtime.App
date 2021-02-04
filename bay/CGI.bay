@@ -64,7 +64,7 @@ static class CGI
 			(
 				$ctx, 
 				$key,
-				new \Runtime\Core\Cookie
+				new \Runtime\Web\App\Cookie
 				(
 					$ctx,
 					\Runtime\Dict::from([
