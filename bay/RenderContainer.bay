@@ -94,6 +94,13 @@ struct RenderContainer extends BaseStruct
 	
 	
 	/**
+	 * Returns page model
+	 */
+	var getPageModel() => this.layout.model[this.layout.page_class];
+	
+	
+	
+	/**
 	 * Remote bus call
 	 * @param Dict items
 	 * @return RemoteCallAnswer
