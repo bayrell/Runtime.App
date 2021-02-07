@@ -43,8 +43,6 @@ use Runtime.Web.App.RouteMiddleware;
 class WebApp extends BaseDriver
 {
 	/* Chains */
-	static const string LAYOUT_CHAIN = "Runtime.Web.App.Layout";
-	static const string PATTERN_CHAIN = "Runtime.Web.App.Pattern";
 	static const string RENDER_CHAIN = "Runtime.Web.App.Render";
 	static const string TITLE_CHAIN = "Runtime.Web.App.Title";
 	static const string EXTERNAL_BUS_CHAIN = "Runtime.Web.App.ExternalBus";
@@ -62,6 +60,7 @@ class WebApp extends BaseDriver
 	static const int RENDER_CHAIN_CALL_PAGE_NOT_FOUND = 3100;
 	static const int RENDER_CHAIN_CALL_ROUTE_AFTER = 3500;
 	static const int RENDER_CHAIN_RESPONSE_BEFORE = 4000;
+	static const int RENDER_CHAIN_LAYOUT = 4300;
 	static const int RENDER_CHAIN_RESPONSE = 4500;
 	static const int RENDER_CHAIN_RESPONSE_AFTER = 5000;
 	
@@ -127,6 +126,7 @@ class WebApp extends BaseDriver
 		LayoutModel layout = rtl::json_decode(root_model);
 		
 		@.getDriver("RenderDriver")
+			.setComponents([layout.layout_class,layout.page_class])
 			.setLayout(layout)
 			.setupCSS( window.document.@querySelector("#root_style") )
 			.setupController
@@ -272,9 +272,16 @@ class WebApp extends BaseDriver
 		
 		/* Render container */
 		@.getDriver("RenderDriver")
+			.setComponents([container.layout.layout_class,container.layout.page_class])
 			.setLayout(container.layout)
 			.repaint()
 		;
+		
+		/* Change title */
+		string title = static::callTitleChain(container.layout, container.layout.title);
+		#ifdef JAVASCRIPT then
+		document.title = title;
+		#endif
 	}
 	
 	
@@ -545,17 +552,13 @@ class WebApp extends BaseDriver
 		if (container == null) return [ container ];
 		if (container.isResponseExists()) return [ container ];
 		
-		/* Get params */
-		LayoutModel layout = static::callLayoutChain(container.layout);
-		Dict params = {};
-		
 		/* Render layout */
-		fn render = rtl::method(layout.layout_class, "render");
-		string layout_content = render(layout, layout, {}, null);
+		fn render = rtl::method(container.layout.layout_class, "render");
+		string layout_content = render(container.layout, container.layout, {}, null);
 		
 		/* Render pattern */
 		fn render = rtl::method(container.pattern_class, "render");
-		string patter_content = render(container, layout, params, layout_content);
+		string patter_content = render(container, container.layout, {}, layout_content);
 		
 		/* Create response */
 		container <= response <= new Response
@@ -596,17 +599,6 @@ class WebApp extends BaseDriver
 	
 	
 	/**
-	 * Layout chain
-	 */
-	pure LayoutModel callLayoutChain(LayoutModel layout)
-	{
-		layout = @.chain(static::LAYOUT_CHAIN, [layout]) |> attr 0;
-		return layout;
-	}
-	
-	
-	
-	/**
 	 * Returns layout CSS
 	 */
 	pure string getLayoutCSS(LayoutModel layout)
@@ -614,7 +606,7 @@ class WebApp extends BaseDriver
 		RenderDriver render = @.getDriver("RenderDriver");
 		
 		/* Get components */
-		Collection components = render.components
+		Collection components = render.default_components
 			.concat([layout.layout_class,layout.page_class])
 			.filter(lib::equalNot(""))
 			.removeDuplicatesIm()
