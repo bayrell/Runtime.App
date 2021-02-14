@@ -19,10 +19,11 @@
 namespace Runtime.Web.App;
 
 use Runtime.BaseStruct;
+use Runtime.Entity;
 use Runtime.Web.App.BusList;
 
 
-struct BusMethod extends BaseStruct
+struct BusMethod extends Entity
 {
 	string object_name = "";
 	string interface_name = "";
@@ -32,17 +33,25 @@ struct BusMethod extends BaseStruct
 	string uri = "";
 	
 	
-	/**
-	 * Extend
-	 */
-	BusMethod addClassItem(string class_name, string class_method_name, BusList class_item, Dict info)
-	{
-		return this.copy
+	/* Entity name for task output */
+	string entityName() => this.class_name ~ "::" ~ this.class_method_name;
+	
+	
+	
+	/* Add class info in Context::getRequiredEntities */
+	Entity addClassInfo(string class_name) => this.copy{ "class_name": class_name };
+	
+	
+	
+	/* Add class info in Context::getSubEntities */
+	Entity addMethodInfo(string class_name, string class_method_name, Entity class_entity, Dict method_info) =>
+		this.copy
 		{
-			"object_name": class_item.object_name,
-			"interface_name": class_item.interface_name,
 			"class_name": class_name,
 			"class_method_name": class_method_name,
-		};
-	}
+			"object_name": class_entity.object_name,
+			"interface_name": class_entity.interface_name,
+		}
+	;
+	
 }

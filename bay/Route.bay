@@ -23,7 +23,7 @@ use Runtime.BaseStruct;
 use Runtime.Entity;
 
 
-struct Route extends BaseStruct
+struct Route extends Entity
 {
 	public string uri = "";
 	public string name = "";
@@ -33,17 +33,24 @@ struct Route extends BaseStruct
 	public Collection<string> params = null;
 	
 	
-	/**
-	 * Extend route
-	 */
-	Route addClassItem(string class_name, string class_method_name, Entity class_item, Dict info)
-	{
-		return this.copy
+	/* Entity name for task output */
+	string entityName() => this.class_name ~ "::" ~ this.class_method_name;
+	
+	
+	
+	/* Add class info in Context::getRequiredEntities */
+	Entity addClassInfo(string class_name) => this.copy{ "class_name": class_name };
+	
+	
+	
+	/* Add class info in Context::getSubEntities */
+	Entity addMethodInfo(string class_name, string class_method_name, Entity class_entity, Dict method_info) =>
+		this.copy
 		{
 			"class_name": class_name,
 			"class_method_name": class_method_name,
-		};
-	}
+		}
+	;
 	
 	
 	

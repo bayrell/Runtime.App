@@ -26,5 +26,10 @@ struct ApiList extends Entity
 {
 	string object_name = "";
 	string interface_name = "";
-	string apiName() => this.object_name != "" ? this.object_name : this.getClassName();
+	
+	/* Entity name for task output */
+	string entityName() => this.value ? this.value : this.name;
+	
+	/* Add class info in Context::getRequiredEntities */
+	Entity addClassInfo(string class_name) => this.copy{ "name": class_name };
 }
