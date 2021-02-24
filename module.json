@@ -9,6 +9,8 @@
 		"Cookie",
 		"ExternalBusDriver",
 		"LayoutModel",
+		"Page",
+		"PageModel",
 		"RemoteCallAnswer",
 		"RemoteCallRequest",
 		"RenderContainer",
@@ -19,6 +21,9 @@
 		"Routes",
 		"SeoModel",
 		"WebApp",
+		"Widget",
+		"WidgetEvent",
+		"WidgetModel",
 		"ModuleDescription"
 	]
 }

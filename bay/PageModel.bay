@@ -15,29 +15,22 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
- 
+
 namespace Runtime.Web.App;
 
-use Runtime.Web.Message;
-use Runtime.Web.App.RemoteCallAnswer;
-use Runtime.Web.App.RemoteCallRequest;
+use Runtime.BaseStruct;
+use Runtime.Web.App.WidgetModel;
 
 
-interface BusInterface
+struct PageModel extends BaseStruct
 {
+	/* Page cation */
+	string action = "";
 	
-	/**
-	 * Send message
-	 * @return string
-	 */
-	async void sendMessage(Message msg);
+	/* Widgets */
+	Dict<WidgetModel> widgets = {};
+	Dict<Collection> widgets_position = {};
 	
-	
-	
-	/**
-	 * Send message
-	 * @return string
-	 */
-	async RemoteCallAnswer remoteBusCall(RemoteCallRequest request);
-	
+	/* Additional page data */
+	Dict data = {};
 }

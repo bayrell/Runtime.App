@@ -1,4 +1,4 @@
-/*!
+<!--
  *  Bayrell Runtime Library
  *
  *  (c) Copyright 2016-2021 "Ildar Bikmamatov" <support@bayrell.org>
@@ -14,30 +14,26 @@
  *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
+-->
+
+<class version="1.0"
+	name="Runtime.Web.App.Widget" extends="Runtime.Web.Component" 
+	module="Runtime.Web.App" model="Runtime.Web.App.PageModel"
+>
+
+<use name="Runtime.Web.Message" />
+<use name="Runtime.Web.Events.BaseEvent" />
+
+
+<script>
+
+/**
+ * On widget event
  */
- 
-namespace Runtime.Web.App;
-
-use Runtime.Web.Message;
-use Runtime.Web.App.RemoteCallAnswer;
-use Runtime.Web.App.RemoteCallRequest;
-
-
-interface BusInterface
+async void widgetEvent(Message<BaseEvent> msg)
 {
-	
-	/**
-	 * Send message
-	 * @return string
-	 */
-	async void sendMessage(Message msg);
-	
-	
-	
-	/**
-	 * Send message
-	 * @return string
-	 */
-	async RemoteCallAnswer remoteBusCall(RemoteCallRequest request);
-	
 }
+
+</script>
+
+</class>

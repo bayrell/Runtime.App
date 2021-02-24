@@ -1,7 +1,7 @@
 /*!
  *  Bayrell Runtime Library
  *
- *  (c) Copyright 2016-2020 "Ildar Bikmamatov" <support@bayrell.org>
+ *  (c) Copyright 2016-2021 "Ildar Bikmamatov" <support@bayrell.org>
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -22,12 +22,15 @@ use Runtime.BaseStruct;
 use Runtime.Web.Message;
 use Runtime.Web.App.Cookie;
 use Runtime.Web.App.LayoutModel;
+use Runtime.Web.App.Page;
+use Runtime.Web.App.PageModel;
 use Runtime.Web.App.RemoteCallAnswer;
 use Runtime.Web.App.RemoteCallRequest;
 use Runtime.Web.App.Request;
 use Runtime.Web.App.Response;
 use Runtime.Web.App.Route;
 use Runtime.Web.App.WebApp;
+use Runtime.Web.App.WidgetModel;
 
 
 struct RenderContainer extends BaseStruct
@@ -65,23 +68,8 @@ struct RenderContainer extends BaseStruct
 	/**
 	 * Set page
 	 */
-	RenderContainer setPage(string page_class, primitive page_model)
-	{
-		Dict model = this.layout.model;
-		if (model == null) model = {};
-		
-		/* Set page model */
-		model = model.setIm(page_class, page_model);
-		
-		return this.copy
-		{
-			"layout": this.layout.copy
-			{
-				"page_class": page_class,
-				"model": model,
-			}
-		};
-	}
+	RenderContainer setPage(string page_class) =>
+		rtl::setAttr(this, ["layout", "page_class"], page_class);
 	
 	
 	
@@ -89,14 +77,85 @@ struct RenderContainer extends BaseStruct
 	 * Set page model
 	 */
 	RenderContainer setPageModel(primitive page_model) =>
-		this.setPage(this.layout.page_class, page_model);
+		rtl::setAttr(this, ["layout", "model", this.layout.page_class], page_model)
+	;
 	
 	
 	
 	/**
 	 * Returns page model
 	 */
-	var getPageModel() => this.layout.model[this.layout.page_class];
+	PageModel getPageModel() => this.layout.model[this.layout.page_class] |> default PageModel null;
+	
+	
+	
+	/**
+	 * Set action
+	 */
+	RenderContainer setAction(string action) =>
+		rtl::setAttr(this, ["layout", "model", this.layout.page_class, "action"], action);
+	
+	
+	
+	/**
+	 * Set title
+	 */
+	RenderContainer setTitle(string title) => rtl::setAttr(this, ["layout", "title"], title);
+	
+	
+	
+	/**
+	 * Set layout name
+	 */
+	RenderContainer setLayout(string layout_name) => rtl::setAttr(this, ["layout", "layout_name"], layout_name);
+	
+	
+	
+	/**
+	 * Add widget
+	 */
+	RenderContainer addWidget(string widget_key, WidgetModel widget = null)
+	{
+		RenderContainer container = this;
+		PageModel page_model = container["layout", "model", this.layout.page_class] |> default PageModel null;
+		if (page_model == null) return container;
+		
+		/* Push widget */
+		Dict<WidgetModel> widgets = page_model.widgets;
+		widgets = widgets.setIm(widget_key, widget);
+		
+		/* Add widgets to container */
+		page_model <= widgets <= widgets;
+		
+		/* Set new model */
+		container = rtl::setAttr(container, ["layout", "model", this.layout.page_class], page_model)
+		
+		return container;
+	}
+	
+	
+	
+	/**
+	 * Set widgets position
+	 */
+	RenderContainer widgetsPosition(string widget_position, Collection widgets)
+	{
+		RenderContainer container = this;
+		PageModel page_model = container["layout", "model", this.layout.page_class] |> default PageModel null;
+		if (page_model == null) return container;
+		
+		/* Push widgets position */
+		Dict<Collection> widgets_position = page_model.widgets_position;
+		widgets_position = widgets_position.setIm(widget_position, widgets);
+		
+		/* Add widgets position to container */
+		page_model <= widgets_position <= widgets_position;
+		
+		/* Set new model */
+		container = rtl::setAttr(container, ["layout", "model", this.layout.page_class], page_model)
+		
+		return container;
+	}
 	
 	
 	

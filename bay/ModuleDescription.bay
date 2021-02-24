@@ -1,7 +1,7 @@
 /*!
  *  Bayrell Runtime Library
  *
- *  (c) Copyright 2016-2020 "Ildar Bikmamatov" <support@bayrell.org>
+ *  (c) Copyright 2016-2021 "Ildar Bikmamatov" <support@bayrell.org>
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -68,12 +68,8 @@ static class ModuleDescription
 	[
 		new Entity{ "name": classof WebApp },
 		
-		#ifdef FRONTEND then
-		
 		/* Register external bus driver */
 		new Driver{ "name": "external_bus", "value": classof ExternalBusDriver },
-		
-		#endif
 		
 		
 		#ifdef BACKEND then

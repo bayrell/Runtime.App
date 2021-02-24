@@ -15,29 +15,21 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
- 
+
 namespace Runtime.Web.App;
 
-use Runtime.Web.Message;
-use Runtime.Web.App.RemoteCallAnswer;
-use Runtime.Web.App.RemoteCallRequest;
+use Runtime.BaseStruct;
+use Runtime.Web.App.RenderContainer;
 
 
-interface BusInterface
+struct WidgetModel extends BaseStruct
 {
-	
-	/**
-	 * Send message
-	 * @return string
-	 */
-	async void sendMessage(Message msg);
-	
+	string action = "";
+	string class_name = "";
 	
 	
 	/**
-	 * Send message
-	 * @return string
+	 * Call route
 	 */
-	async RemoteCallAnswer remoteBusCall(RemoteCallRequest request);
-	
+	static async RenderContainer callRoute(RenderContainer container, string widget_key) => container;
 }

@@ -1,7 +1,7 @@
 /*!
  *  Bayrell Runtime Library
  *
- *  (c) Copyright 2016-2020 "Ildar Bikmamatov" <support@bayrell.org>
+ *  (c) Copyright 2016-2021 "Ildar Bikmamatov" <support@bayrell.org>
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -37,10 +37,8 @@ struct Route extends Entity
 	string entityName() => this.class_name ~ "::" ~ this.class_method_name;
 	
 	
-	
 	/* Add class info in Context::getRequiredEntities */
 	Entity addClassInfo(string class_name) => this.copy{ "class_name": class_name };
-	
 	
 	
 	/* Add class info in Context::getSubEntities */

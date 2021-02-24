@@ -1,7 +1,7 @@
 /*!
  *  Bayrell Runtime Library
  *
- *  (c) Copyright 2016-2020 "Ildar Bikmamatov" <support@bayrell.org>
+ *  (c) Copyright 2016-2021 "Ildar Bikmamatov" <support@bayrell.org>
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -19,7 +19,9 @@
 namespace Runtime.Web.App;
 
 use Runtime.BaseStruct;
+use Runtime.Web.App.PageModel;
 use Runtime.Web.App.Route;
+use Runtime.Web.App.WidgetModel;
 
 
 struct LayoutModel extends BaseStruct
@@ -50,5 +52,41 @@ struct LayoutModel extends BaseStruct
 	string page_class = "";
 	
 	/* Model by class name */
-	Dict<primitive> model = {};
+	Dict<PageModel> model = {};
+	
+	/* Extend components */
+	Collection<string> extend_components = [];
+	
+	
+	/**
+	 * Get components
+	 */
+	Collection<string> getComponents()
+	{
+		Vector components = new Vector();
+		
+		/* Add widgets */
+		PageModel page_model = this["model", this.page_class] |> default PageModel null;
+		if (page_model)
+		{
+			Collection widget_keys = page_model.widgets.keys();
+			for (int i=0; i<widget_keys.count(); i++)
+			{
+				string widget_key = widget_keys[i];
+				WidgetModel widget_model = page_model.widgets[widget_key] |> default WidgetModel null;
+				if (widget_model != null and widget_model.class_name != "" and rtl::class_exists(widget_model.class_name))
+				{
+					components.pushValue(widget_model.class_name);
+				}
+			}
+		}
+		
+		/* Add extend components */
+		components = components.concat(this.extend_components);
+		
+		/* Append layout and page */
+		components = components.concat([ this.page_class, this.layout_class ])
+		
+		return components.toCollection();
+	}
 }

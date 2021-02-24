@@ -1,7 +1,7 @@
 /*!
  *  Bayrell Runtime Library
  *
- *  (c) Copyright 2016-2020 "Ildar Bikmamatov" <support@bayrell.org>
+ *  (c) Copyright 2016-2021 "Ildar Bikmamatov" <support@bayrell.org>
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -29,6 +29,7 @@ use Runtime.LambdaChainClass;
 use Runtime.Web.RenderDriver;
 use Runtime.Web.App.BusInterface;
 use Runtime.Web.App.LayoutModel;
+use Runtime.Web.App.PageModel;
 use Runtime.Web.App.RemoteCallAnswer;
 use Runtime.Web.App.RemoteCallRequest;
 use Runtime.Web.App.RenderContainer;
@@ -37,6 +38,7 @@ use Runtime.Web.App.Response;
 use Runtime.Web.App.Route;
 use Runtime.Web.App.RouteList;
 use Runtime.Web.App.RouteMiddleware;
+use Runtime.Web.App.WidgetModel;
 
 
 @LambdaChainClass{}
@@ -58,17 +60,55 @@ class WebApp extends BaseDriver
 	static const int RENDER_CHAIN_CALL_ROUTE_MIDDLEWARE = 2500;
 	static const int RENDER_CHAIN_CALL_ROUTE = 3000;
 	static const int RENDER_CHAIN_CALL_PAGE_NOT_FOUND = 3100;
-	static const int RENDER_CHAIN_CALL_ROUTE_AFTER = 3500;
-	static const int RENDER_CHAIN_RESPONSE_BEFORE = 4000;
-	static const int RENDER_CHAIN_LAYOUT = 4300;
-	static const int RENDER_CHAIN_RESPONSE = 4500;
-	static const int RENDER_CHAIN_RESPONSE_AFTER = 5000;
+	static const int RENDER_CHAIN_CALL_WIDGETS = 3200;
+	static const int RENDER_CHAIN_CALL_WIDGETS_CALL_ROUTE = 3500;
+	static const int RENDER_CHAIN_CALL_ROUTE_AFTER = 4000;
+	static const int RENDER_CHAIN_LAYOUT = 4500;
+	static const int RENDER_CHAIN_RESPONSE_BEFORE = 5000;
+	static const int RENDER_CHAIN_RESPONSE = 5500;
+	static const int RENDER_CHAIN_RESPONSE_AFTER = 10000;
 	
 	
 	/* Variables */
+	RenderDriver driver = null;
 	Collection<Route> routes = null;
 	Vector history = new Vector();
 	string route_prefix = "";
+	
+	
+	
+	/**
+	 * Returns page model
+	 */
+	primitive getPageModel()
+	{
+		return this.driver.layout.model[ this.driver.layout.page_class ];
+	}
+	
+	
+	
+	/**
+	 * Returns widget model
+	 */
+	primitive getWidgetModel(string widget_key)
+	{
+		PageModel page_model = this.driver.layout.model[ this.driver.layout.page_class ];
+		if (page_model == null) return null;
+		return page_model.widgets[widget_key];
+	}
+	
+	
+	
+	/**
+	 * Returns widgets
+	 */
+	primitive getWidgets(string widget_key)
+	{
+		PageModel page_model = this.driver.layout.model[ this.driver.layout.page_class ];
+		if (page_model == null) return null;
+		return page_model.widgets;
+	}
+	
 	
 	
 	/**
@@ -125,8 +165,11 @@ class WebApp extends BaseDriver
 		root_model = rs::base64_decode_url(root_model);
 		LayoutModel layout = rtl::json_decode(root_model);
 		
+		WebApp app = @.getDriver("WebApp");
+		app.driver = @.getDriver("RenderDriver");
+		
 		@.getDriver("RenderDriver")
-			.setComponents([layout.layout_class,layout.page_class])
+			.setComponents(layout.getComponents())
 			.setLayout(layout)
 			.setupCSS( window.document.@querySelector("#root_style") )
 			.setupController
@@ -272,7 +315,7 @@ class WebApp extends BaseDriver
 		
 		/* Render container */
 		@.getDriver("RenderDriver")
-			.setComponents([container.layout.layout_class,container.layout.page_class])
+			.setComponents(container.layout.getComponents())
 			.setLayout(container.layout)
 			.repaint()
 		;
@@ -453,7 +496,6 @@ class WebApp extends BaseDriver
 	{
 		"name": static::RENDER_CHAIN,
 		"pos": static::RENDER_CHAIN_CALL_ROUTE_MIDDLEWARE,
-		"is_async": true,
 	}
 	static async RenderContainer renderChain_CallRouteMiddleware(RenderContainer container)
 	{
@@ -497,7 +539,6 @@ class WebApp extends BaseDriver
 	{
 		"name": static::RENDER_CHAIN,
 		"pos": static::RENDER_CHAIN_CALL_ROUTE,
-		"is_async": true,
 	}
 	static async RenderContainer renderChain_CallRoute(RenderContainer container)
 	{
@@ -512,6 +553,40 @@ class WebApp extends BaseDriver
 			container.route.class_method_name,
 			[ container ]
 		) |> attr 0;
+		
+		return [ container ];
+	}
+	
+	
+	
+	/**
+	 * Render chain
+	 * Call route
+	 */
+	@LambdaChain
+	{
+		"name": static::RENDER_CHAIN,
+		"pos": static::RENDER_CHAIN_CALL_WIDGETS_CALL_ROUTE,
+	}
+	static async RenderContainer renderChain_WidgetCallRoute(RenderContainer container)
+	{
+		if (container == null) return [ container ];
+		if (container.isResponseExists()) return [ container ];
+		if (not container.isPageExists()) return [ container ];
+		
+		PageModel page_model = container["layout", "model", container.layout.page_class] |> default PageModel null;
+		if (!page_model) return [ container ];
+		
+		Collection widget_keys = page_model.widgets.keys();
+		for (int i=0; i<widget_keys.count(); i++)
+		{
+			string widget_key = widget_keys[i];
+			WidgetModel widget_model = page_model.widgets[widget_key] |> default WidgetModel null;
+			if (widget_model != null)
+			{
+				container = await widget_model::callRoute(container, widget_key);
+			}
+		}
 		
 		return [ container ];
 	}
@@ -607,7 +682,7 @@ class WebApp extends BaseDriver
 		
 		/* Get components */
 		Collection components = render.default_components
-			.concat([layout.layout_class,layout.page_class])
+			.concat( layout.getComponents() )
 			.filter(lib::equalNot(""))
 			.removeDuplicatesIm()
 		;

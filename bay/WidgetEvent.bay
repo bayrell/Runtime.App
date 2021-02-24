@@ -15,29 +15,15 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
- 
+
 namespace Runtime.Web.App;
 
-use Runtime.Web.Message;
-use Runtime.Web.App.RemoteCallAnswer;
-use Runtime.Web.App.RemoteCallRequest;
+use Runtime.Web.Events.BaseEvent;
 
 
-interface BusInterface
+struct WidgetEvent extends BaseEvent
 {
-	
-	/**
-	 * Send message
-	 * @return string
-	 */
-	async void sendMessage(Message msg);
-	
-	
-	
-	/**
-	 * Send message
-	 * @return string
-	 */
-	async RemoteCallAnswer remoteBusCall(RemoteCallRequest request);
-	
+	string dest = "";
+	string action = "";
+	primitive tag = null;
 }
