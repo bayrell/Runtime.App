@@ -92,8 +92,8 @@ struct RenderContainer extends BaseStruct
 	/**
 	 * Set action
 	 */
-	RenderContainer setAction(string action) =>
-		rtl::setAttr(this, ["layout", "model", this.layout.page_class, "action"], action);
+	RenderContainer setPageAction(string action) =>
+		rtl::setAttr(this, ["layout", "model", this.layout.page_class, "page_action"], action);
 	
 	
 	

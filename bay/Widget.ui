@@ -28,10 +28,56 @@
 <script>
 
 /**
- * On widget event
+ * Returns widget key
  */
-async void widgetEvent(Message<BaseEvent> msg)
+string getWidgetKey() => this.params["widget_key"];
+
+
+
+/**
+ * Handle widget event
+ */
+async void handleEvent(Message<BaseEvent> msg)
 {
+}
+
+
+
+/**
+ * Returns widget model
+ */
+primitive widgetModel(Collection model_path = null, var def_val = null)
+{
+	if (model_path == null) model_path = [];
+	string widget_key = this.params["widget_key"];
+	Collection widget_path = ["widgets", widget_key];
+	return this.model(widget_path.concat(model_path), def_val);
+}
+
+
+
+/**
+ * Update model
+ */
+void widgetUpdate(string method_name = "")
+{
+	/* Get widget key */
+	string widget_key = this.params["widget_key"];
+	
+	/* Get function arguments */
+	var args = new Vector();
+	#ifcode JAVASCRIPT then
+	for (var i=((typeof ctx == "undefined") ? 1 : 2); i<arguments.length; i++) args.pushValue(ctx, arguments[i]);
+	#endif
+	
+	/* Get current model */
+	primitive model = this.model(["widgets", widget_key]);
+	
+	/* Update model */
+	model = static::updateModel(model, method_name, args.toCollection());
+	
+	/* Set new model */
+	this.driver.updateModel(this.model_path.concat(["widgets", widget_key]), model);
 }
 
 </script>

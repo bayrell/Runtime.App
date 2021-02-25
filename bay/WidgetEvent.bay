@@ -23,7 +23,4 @@ use Runtime.Web.Events.BaseEvent;
 
 struct WidgetEvent extends BaseEvent
 {
-	string dest = "";
-	string action = "";
-	primitive tag = null;
 }

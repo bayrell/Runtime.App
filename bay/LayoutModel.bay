@@ -19,6 +19,7 @@
 namespace Runtime.Web.App;
 
 use Runtime.BaseStruct;
+use Runtime.Web.RenderDriver;
 use Runtime.Web.App.PageModel;
 use Runtime.Web.App.Route;
 use Runtime.Web.App.WidgetModel;
@@ -87,6 +88,14 @@ struct LayoutModel extends BaseStruct
 		/* Append layout and page */
 		components = components.concat([ this.page_class, this.layout_class ])
 		
-		return components.toCollection();
+		return components.toCollection().removeDuplicatesIm();
 	}
+	
+	
+	
+	/**
+	 * Get all components
+	 */
+	Collection<string> getRequiredComponents() => RenderDriver::getRequiredComponents( this.getComponents() );
+	
 }
