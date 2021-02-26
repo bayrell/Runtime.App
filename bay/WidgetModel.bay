@@ -19,6 +19,7 @@
 namespace Runtime.Web.App;
 
 use Runtime.BaseStruct;
+use Runtime.Web.App.PageModel;
 use Runtime.Web.App.RenderContainer;
 
 
@@ -29,7 +30,48 @@ struct WidgetModel extends BaseStruct
 	
 	
 	/**
+	 * Extend widget model
+	 */
+	pure PageModel extendWidgetModel(BaseStruct layout, PageModel model, Dict params, string widget_key) => model;
+	
+	
+	
+	/**
+	 * Call route widget model
+	 */
+	static async WidgetModel callRouteWidgetModel(RenderContainer container, string widget_key, WidgetModel widget_model) =>
+		widget_model;
+	
+	
+	
+	/**
 	 * Call route
 	 */
-	static async RenderContainer callRoute(RenderContainer container, string widget_key) => container;
+	static async RenderContainer callRoute(RenderContainer container, string widget_key)
+	{
+		/* Page class */
+		string page_class = container.layout.page_class;
+		
+		/* Get page model */
+		PageModel page_model = container.getPageModel();
+		if (page_model == null) return container;
+		
+		/* Get widget model */
+		WidgetModel widget_model = page_model.widgets[widget_key] |> default WidgetModel null;
+		if (widget_model == null) return container;
+		
+		/* Check widget model page action */
+		if (widget_model.page_action != page_model.page_action) return container;
+		
+		/* Search */
+		widget_model = await static::callRouteWidgetModel(container, widget_key, widget_model);
+		
+		/* Set widget model */
+		page_model <= widgets <= { widget_key } <= widget_model;
+		
+		/* Set page model */
+		container <= layout <= model <= { page_class } <= page_model;
+		
+		return container;
+	}
 }

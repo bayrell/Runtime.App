@@ -62,7 +62,6 @@ class ExternalBusDriver extends BaseDriver implements BusInterface
 		string interface_name = request.interface_name;
 		string method_name = request.method_name;
 		var data = request.data;
-		var storage = request.storage;
 		
 		string bus_gate = @.env("X-ROUTE-PREFIX", "") ~ "/api";
 		string url = (uri != "") ? uri : 
@@ -74,7 +73,6 @@ class ExternalBusDriver extends BaseDriver implements BusInterface
 		{
 			"url": url,
 			"data": data,
-			"storage": storage,
 		};
 		
 		/* Answer */
@@ -345,10 +343,9 @@ Object.assign(Runtime.Web.App.ExternalBusDriver,
 	{
 		var url = obj.get(ctx, "url");
 		var data = obj.get(ctx, "data");
-		var storage = obj.get(ctx, "storage");
 		
 		/* Build pos data */
-		var build_data = this.buildData(ctx, data, storage);
+		var build_data = this.buildData(ctx, data);
 		var post_data = this.buildPostData(ctx, build_data);
 		
 		/* Send post */
@@ -363,14 +360,12 @@ Object.assign(Runtime.Web.App.ExternalBusDriver,
 	 * @params serializable data
 	 * @return Vector
 	 */
-	buildData: function(ctx, data, storage)
+	buildData: function(ctx, data)
 	{
 		var res = [];
 		data = Runtime.RuntimeUtils.json_encode(ctx, data);
-		storage = Runtime.RuntimeUtils.json_encode(ctx, storage);
 		/*json = btoa( unescape(encodeURIComponent(json)) );*/
 		res.push({"key": "data", "value": data});
-		res.push({"key": "storage", "value": storage});
 		return res;
 	},
 	

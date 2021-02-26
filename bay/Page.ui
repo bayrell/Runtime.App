@@ -48,7 +48,6 @@ pure PageModel extendComponentModel(BaseStruct layout, PageModel model, Dict par
 </script>
 
 
-
 <template name="renderWidgets" args="LayoutModel layout, PageModel model, Dict params, string widget_position">
 
 %var Collection widgets = model.widgets_position[widget_position] |> default Collection null;
@@ -57,16 +56,21 @@ pure PageModel extendComponentModel(BaseStruct layout, PageModel model, Dict par
 	%for (int i=0; i<widgets.count(); i++)
 	{
 		%var string widget_key = widgets[i];
-		%var string class_name = rtl::attr(model, ["widgets", widget_key, "class_name"]) |> default string "";
-		%if (class_name != "")
-		{
-			<div class='widget' data-widget={ widget_key } @key={ widget_key }>
-				<{class_name} @bind=[] widget_key={ widget_key } @event:WidgetEvent="onWidgetEvent"></{class_name}>
-			</div>
-		}
+		{ static::renderWidget(layout, model, params, widget_key) }
 	}
 }
 
+</template>
+
+
+<template name="renderWidget" args="LayoutModel layout, PageModel model, Dict params, string widget_key">
+	%var string class_name = rtl::attr(model, ["widgets", widget_key, "class_name"]) |> default string "";
+	%if (class_name != "")
+	{
+		<div class='widget' data-widget={ widget_key } @key={ widget_key }>
+			<{class_name} @bind=[] widget_key={ widget_key } @event:WidgetEvent="onWidgetEvent"></{class_name}>
+		</div>
+	}
 </template>
 
 

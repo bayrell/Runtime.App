@@ -86,7 +86,7 @@ struct LayoutModel extends BaseStruct
 		components = components.concat(this.extend_components);
 		
 		/* Append layout and page */
-		components = components.concat([ this.page_class, this.layout_class ])
+		components = components.concat([ this.layout_class, this.page_class ])
 		
 		return components.toCollection().removeDuplicatesIm();
 	}
