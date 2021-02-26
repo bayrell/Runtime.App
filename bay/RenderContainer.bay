@@ -169,7 +169,7 @@ struct RenderContainer extends BaseStruct
 		/* Set storage */
 		items = items.copy
 		{
-			"storage": this.api_storage,
+			"api_storage": this.api_storage,
 		};
 		
 		/* Send request */

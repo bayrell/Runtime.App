@@ -27,10 +27,43 @@
 
 <script>
 
+
 /**
  * Returns widget key
  */
 string getWidgetKey() => this.params["widget_key"];
+
+
+
+/**
+ * Returns true if need to repaint component
+ */
+bool isRepaint()
+{
+	if (this.is_new_element)
+	{
+		return true;
+	}
+	/* Check widget model */
+	string widget_key = this.params["widget_key"];
+	primitive old_model = this.old_model["widgets"][widget_key];
+	primitive new_model = this.new_model["widgets"][widget_key];
+	if (new_model != old_model)
+	{
+		return true;
+	}
+	/* Check component params */
+	if (not this.equalParams())
+	{
+		return true;
+	}
+	/* Check watch model */
+	if (this.isRepaintWatch())
+	{
+		return true;
+	}
+	return false;
+}
 
 
 

@@ -70,10 +70,6 @@ static class Routes
 			string data1 = container.request.payload.get("data", "");
 			var data = rtl::json_decode(data1);
 			
-			/* Decode storage */
-			string storage1 = container.request.payload.get("storage", "");
-			var storage = rtl::json_decode(storage1);
-			
 			/* Get time and sign */
 			string sign = container.request.payload.get("sign", "") |> default string "";
 			int time = container.request.payload.get("time", "") |> default int 0;
