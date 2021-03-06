@@ -26,6 +26,7 @@ use Runtime.BaseStruct;
 use Runtime.Context;
 use Runtime.LambdaChain;
 use Runtime.LambdaChainClass;
+use Runtime.Web.Controller as RenderController;
 use Runtime.Web.RenderDriver;
 use Runtime.Web.App.BusInterface;
 use Runtime.Web.App.LayoutModel;
@@ -64,6 +65,7 @@ class WebApp extends BaseDriver
 	static const int RENDER_CHAIN_CALL_WIDGETS_CALL_ROUTE = 3500;
 	static const int RENDER_CHAIN_CALL_ROUTE_AFTER = 4000;
 	static const int RENDER_CHAIN_LAYOUT = 4500;
+	static const int RENDER_CHAIN_EXTEND_COMPONENTS = 4900;
 	static const int RENDER_CHAIN_RESPONSE_BEFORE = 5000;
 	static const int RENDER_CHAIN_RESPONSE = 5500;
 	static const int RENDER_CHAIN_RESPONSE_AFTER = 10000;
@@ -161,26 +163,18 @@ class WebApp extends BaseDriver
 	 */
 	static async void appRun()
 	{
-		string root_model = window.document.@querySelector("#root_model").value;
-		root_model = rs::base64_decode_url(root_model);
-		LayoutModel layout = rtl::json_decode(root_model);
-		
 		WebApp app = @.getDriver("WebApp");
 		app.driver = @.getDriver("RenderDriver");
 		
-		@.getDriver("RenderDriver")
-			.setComponents(layout.getComponents())
-			.setLayout(layout)
-			.setupCSS( window.document.@querySelector("#root_style") )
-			.setupController
-			(
-				"root",
-				window.document.@querySelector("#root"),
-				layout.layout_class,
-				[]
-			)
-			.repaint()
-		;
+		/* Get root controller */
+		RenderController root_controller = app.driver.getController("root");
+		
+		/* Repaint all */
+		@.getDriver("RenderDriver").repaint();
+		
+		#ifcode JAVASCRIPT then
+		window["RootController"] = root_controller;
+		#endif
 	}
 	
 	
@@ -312,13 +306,20 @@ class WebApp extends BaseDriver
 		
 		/* Render request */
 		RenderContainer container = await this.renderRequest(request);
+		RenderDriver render_driver = @.getDriver("RenderDriver");
 		
-		/* Render container */
-		@.getDriver("RenderDriver")
+		/* Change layout class */
+		RenderController root_controller = render_driver.getController("root");
+		root_controller.class_name = container.layout.layout_class;
+		
+		/* Set layout and new components */
+		render_driver
 			.setComponents(container.layout.getComponents())
 			.setLayout(container.layout)
-			.repaint()
 		;
+		
+		/* Repaint all */
+		render_driver.repaint();
 		
 		/* Change title */
 		string title = static::callTitleChain(container.layout, container.layout.title);
@@ -676,21 +677,7 @@ class WebApp extends BaseDriver
 	/**
 	 * Returns layout CSS
 	 */
-	pure string getLayoutCSS(LayoutModel layout)
-	{
-		RenderDriver render = @.getDriver("RenderDriver");
-		
-		/* Get components */
-		Collection components = render.default_components
-			.concat( layout.getComponents() )
-			.filter(lib::equalNot(""))
-			.removeDuplicatesIm()
-		;
-		
-		/* Returns css from components */
-		string css = render.getCSS(components);
-		return css;
-	}
+	pure string getLayoutCSS(LayoutModel layout) => @.getDriver("RenderDriver").getCSS( layout.getComponents() );
 	
 	
 	

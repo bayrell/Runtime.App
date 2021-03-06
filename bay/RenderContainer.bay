@@ -98,6 +98,13 @@ struct RenderContainer extends BaseStruct
 	
 	
 	/**
+	 * Set action
+	 */
+	RenderContainer setPageModelAttr(Collection attr, var value) =>
+		rtl::setAttr(this, ["layout", "model", this.layout.page_class].concat(attr), value);
+		
+		
+	/**
 	 * Set title
 	 */
 	RenderContainer setTitle(string title) => rtl::setAttr(this, ["layout", "title"], title);
