@@ -24,6 +24,7 @@
 		"Widget",
 		"WidgetEvent",
 		"WidgetModel",
+		"WidgetSignal",
 		"ModuleDescription"
 	]
 }

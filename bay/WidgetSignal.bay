@@ -18,14 +18,9 @@
 
 namespace Runtime.Web.App;
 
-use Runtime.BaseStruct;
-use Runtime.Web.App.PageModel;
-use Runtime.Web.App.RenderContainer;
+use Runtime.Web.Events.SignalEvent;
 
 
-struct WidgetModel extends BaseStruct
+struct WidgetSignal extends SignalEvent
 {
-	/* Page action */
-	string page_action = "";
-	string class_name = "";
 }

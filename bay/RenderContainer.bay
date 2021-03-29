@@ -92,8 +92,8 @@ struct RenderContainer extends BaseStruct
 	/**
 	 * Set action
 	 */
-	RenderContainer setPageAction(string action) =>
-		rtl::setAttr(this, ["layout", "model", this.layout.page_class, "page_action"], action);
+	RenderContainer setPageAction(string page_action) =>
+		rtl::setAttr(this, ["layout", "model", this.layout.page_class, "page_action"], page_action);
 	
 	
 	
@@ -145,7 +145,7 @@ struct RenderContainer extends BaseStruct
 	/**
 	 * Set widgets position
 	 */
-	RenderContainer widgetsPosition(string widget_position, Collection widgets)
+	RenderContainer widgetsPosition(string page_action, Collection widgets)
 	{
 		RenderContainer container = this;
 		PageModel page_model = container["layout", "model", this.layout.page_class] |> default PageModel null;
@@ -153,7 +153,7 @@ struct RenderContainer extends BaseStruct
 		
 		/* Push widgets position */
 		Dict<Collection> widgets_position = page_model.widgets_position;
-		widgets_position = widgets_position.setIm(widget_position, widgets);
+		widgets_position = widgets_position.setIm(page_action, widgets);
 		
 		/* Add widgets position to container */
 		page_model <= widgets_position <= widgets_position;

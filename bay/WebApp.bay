@@ -314,7 +314,7 @@ class WebApp extends BaseDriver
 		
 		/* Set layout and new components */
 		render_driver
-			.setComponents(container.layout.getComponents())
+			.setDefaultComponents(container.layout.getComponents())
 			.setLayout(container.layout)
 		;
 		
@@ -585,7 +585,14 @@ class WebApp extends BaseDriver
 			WidgetModel widget_model = page_model.widgets[widget_key] |> default WidgetModel null;
 			if (widget_model != null)
 			{
-				container = await widget_model::callRoute(container, widget_key);
+				string widget_class = widget_model.class_name;
+				if (widget_class and rtl::method_exists(widget_class, "callRouteWidget"))
+				{
+					container = await rtl::applyMethodAsync
+					(
+						widget_class, "callRouteWidget", [container, widget_key]
+					) |> attr 0;
+				}
 			}
 		}
 		

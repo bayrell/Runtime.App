@@ -21,8 +21,13 @@
 	module="Runtime.Web.App" model="Runtime.Web.App.PageModel"
 >
 
+<use name="Runtime.BaseStruct" />
 <use name="Runtime.Web.Message" />
 <use name="Runtime.Web.Events.BaseEvent" />
+<use name="Runtime.Web.App.RenderContainer" />
+<use name="Runtime.Web.App.WidgetEvent" />
+<use name="Runtime.Web.App.WidgetModel" />
+<use name="Runtime.Web.App.WidgetSignal" />
 
 
 <script>
@@ -32,6 +37,52 @@
  * Returns widget key
  */
 string getWidgetKey() => this.params["widget_key"];
+
+
+
+/**
+ * Call route widget model
+ */
+static async WidgetModel callRouteWidgetModel
+(RenderContainer container, PageModel page_model, string widget_key, WidgetModel widget_model) =>
+	widget_model;
+
+
+
+/**
+ * Call route
+ */
+static async RenderContainer callRouteWidget(RenderContainer container, string widget_key)
+{
+	/* Page class */
+	string page_class = container.layout.page_class;
+	
+	/* Get page model */
+	PageModel page_model = container.getPageModel();
+	if (page_model == null) return [ container ];
+	
+	/* Get widget model */
+	WidgetModel widget_model = page_model.widgets[widget_key] |> default WidgetModel null;
+	if (widget_model == null) return [ container ];
+	
+	/* Search */
+	widget_model = await static::callRouteWidgetModel(container, page_model, widget_key, widget_model);
+	
+	/* Set widget model */
+	page_model <= widgets <= { widget_key } <= widget_model;
+	
+	/* Set page model */
+	container <= layout <= model <= { page_class } <= page_model;
+	
+	return [ container ];
+}
+
+
+
+/**
+ * Extend component model
+ */
+pure PageModel extendWidgetModel(BaseStruct layout, PageModel model, Dict params, string widget_key) => model;
 
 
 
@@ -63,15 +114,6 @@ bool isRepaint()
 		return true;
 	}
 	return false;
-}
-
-
-
-/**
- * Handle widget event
- */
-async void handleEvent(Message<BaseEvent> msg)
-{
 }
 
 
@@ -113,6 +155,26 @@ void widgetUpdate(string method_name = "")
 	this.driver.updateModel(this.model_path.concat(["widgets", widget_key]), model);
 }
 
+
+
+/**
+ * Create widget
+ */
+void onCreate()
+{
+	parent::onCreate();
+	
+	/* Add widget signal listener */
+	Component c = this.getParentComponent();
+	this.driver.addEventListener
+	(
+		classof WidgetSignal,
+		c.vdom, this.vdom,
+		this.vdom.getPathId(), "onSignal"
+	);
+}
+
+ 
 </script>
 
 </class>
