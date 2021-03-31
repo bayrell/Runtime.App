@@ -18,6 +18,7 @@
 
 namespace Runtime.Web.App;
 
+use Runtime.lib;
 use Runtime.BaseStruct;
 use Runtime.Web.RenderDriver;
 use Runtime.Web.App.PageModel;
@@ -98,4 +99,27 @@ struct LayoutModel extends BaseStruct
 	 */
 	Collection<string> getRequiredComponents() => RenderDriver::getRequiredComponents( this.getComponents() );
 	
+	
+	
+	/**
+	 * Returns page model
+	 */
+	PageModel getPageModel(Collection model_path = null) =>
+		this.model
+		|> lib::attr( [ this.page_class ].concat(model_path) )
+	;
+	
+	
+	
+	/**
+	 * Set page
+	 */
+	LayoutModel setPage(string page_class) => rtl::setAttr(this, ["page_class"], page_class);
+	
+	
+	
+	/**
+	 * Set page model
+	 */
+	LayoutModel setPageModel(primitive page_model) => rtl::setAttr(this, ["model", this.layout.page_class], page_model);
 }

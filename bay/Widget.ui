@@ -18,12 +18,13 @@
 
 <class version="1.0"
 	name="Runtime.Web.App.Widget" extends="Runtime.Web.Component" 
-	module="Runtime.Web.App" model="Runtime.Web.App.PageModel"
+	module="Runtime.Web.App" model="Runtime.Web.App.WidgetModel"
 >
 
 <use name="Runtime.BaseStruct" />
 <use name="Runtime.Web.Message" />
 <use name="Runtime.Web.Events.BaseEvent" />
+<use name="Runtime.Web.App.PageModel" />
 <use name="Runtime.Web.App.RenderContainer" />
 <use name="Runtime.Web.App.WidgetEvent" />
 <use name="Runtime.Web.App.WidgetModel" />
@@ -80,9 +81,9 @@ static async RenderContainer callRouteWidget(RenderContainer container, string w
 
 
 /**
- * Extend component model
+ * Extend page model
  */
-pure PageModel extendWidgetModel(BaseStruct layout, PageModel model, Dict params, string widget_key) => model;
+pure PageModel extendPageModel(BaseStruct layout, PageModel model, Dict params, string widget_key) => model;
 
 
 
@@ -96,10 +97,7 @@ bool isRepaint()
 		return true;
 	}
 	/* Check widget model */
-	string widget_key = this.params["widget_key"];
-	primitive old_model = this.old_model["widgets"][widget_key];
-	primitive new_model = this.new_model["widgets"][widget_key];
-	if (new_model != old_model)
+	if (this.new_model != this.old_model)
 	{
 		return true;
 	}
@@ -114,45 +112,6 @@ bool isRepaint()
 		return true;
 	}
 	return false;
-}
-
-
-
-/**
- * Returns widget model
- */
-primitive widgetModel(Collection model_path = null, var def_val = null)
-{
-	if (model_path == null) model_path = [];
-	string widget_key = this.params["widget_key"];
-	Collection widget_path = ["widgets", widget_key];
-	return this.model(widget_path.concat(model_path), def_val);
-}
-
-
-
-/**
- * Update model
- */
-void widgetUpdate(string method_name = "")
-{
-	/* Get widget key */
-	string widget_key = this.params["widget_key"];
-	
-	/* Get function arguments */
-	var args = new Vector();
-	#ifcode JAVASCRIPT then
-	for (var i=((typeof ctx == "undefined") ? 1 : 2); i<arguments.length; i++) args.pushValue(ctx, arguments[i]);
-	#endif
-	
-	/* Get current model */
-	primitive model = this.model(["widgets", widget_key]);
-	
-	/* Update model */
-	model = static::updateModel(model, method_name, args.toCollection());
-	
-	/* Set new model */
-	this.driver.updateModel(this.model_path.concat(["widgets", widget_key]), model);
 }
 
 

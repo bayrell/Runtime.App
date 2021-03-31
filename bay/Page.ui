@@ -42,9 +42,9 @@ pure PageModel extendComponentModel(BaseStruct layout, PageModel model, Dict par
 		if (widget_model != null)
 		{
 			string widget_class = widget_model.class_name;
-			if (widget_class and rtl::method_exists(widget_class, "extendWidgetModel"))
+			if (widget_class and rtl::method_exists(widget_class, "extendPageModel"))
 			{
-				model = rtl::applyMethod(widget_class, "extendWidgetModel", [layout, model, params, widget_key]);
+				model = rtl::applyMethod(widget_class, "extendPageModel", [layout, model, params, widget_key]);
 			}
 		}
 	}
@@ -74,7 +74,8 @@ pure PageModel extendComponentModel(BaseStruct layout, PageModel model, Dict par
 	%if (class_name != "")
 	{
 		<div class='widget' data-widget={ widget_key } @key={ widget_key }>
-			<{class_name} @bind=[] widget_key={ widget_key } @event:WidgetEvent="onWidgetEvent"></{class_name}>
+			<{class_name} @bind=["widgets", widget_key] widget_key={ widget_key }
+				@event:WidgetEvent="onWidgetEvent"></{class_name}>
 		</div>
 	}
 </template>

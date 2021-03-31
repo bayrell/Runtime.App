@@ -18,6 +18,7 @@
 
 namespace Runtime.Web.App;
 
+use Runtime.lib;
 use Runtime.BaseStruct;
 use Runtime.Web.Message;
 use Runtime.Web.App.Cookie;
@@ -85,7 +86,10 @@ struct RenderContainer extends BaseStruct
 	/**
 	 * Returns page model
 	 */
-	PageModel getPageModel() => this.layout.model[this.layout.page_class] |> default PageModel null;
+	PageModel getPageModel(Collection model_path = null) =>
+		this.layout.model
+		|> lib::attr( [ this.layout.page_class ].concat(model_path) )
+	;
 	
 	
 	
@@ -104,6 +108,7 @@ struct RenderContainer extends BaseStruct
 		rtl::setAttr(this, ["layout", "model", this.layout.page_class].concat(attr), value);
 		
 		
+	
 	/**
 	 * Set title
 	 */

@@ -637,7 +637,7 @@ class WebApp extends BaseDriver
 		
 		/* Render layout */
 		fn render = rtl::method(container.layout.layout_class, "render");
-		string layout_content = render(container.layout, container.layout, {}, null);
+		string layout_content = render(container.layout, [], {}, null);
 		
 		/* Render pattern */
 		fn render = rtl::method(container.pattern_class, "render");
