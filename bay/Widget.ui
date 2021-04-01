@@ -24,6 +24,7 @@
 <use name="Runtime.BaseStruct" />
 <use name="Runtime.Web.Message" />
 <use name="Runtime.Web.Events.BaseEvent" />
+<use name="Runtime.Web.App.LayoutModel" />
 <use name="Runtime.Web.App.PageModel" />
 <use name="Runtime.Web.App.RenderContainer" />
 <use name="Runtime.Web.App.WidgetEvent" />
@@ -44,8 +45,7 @@ string getWidgetKey() => this.params["widget_key"];
 /**
  * Call route widget model
  */
-static async WidgetModel callRouteWidgetModel
-(RenderContainer container, PageModel page_model, string widget_key, WidgetModel widget_model) =>
+static async WidgetModel callRouteWidgetModel(RenderContainer container, string widget_key, WidgetModel widget_model) =>
 	widget_model;
 
 
@@ -67,7 +67,7 @@ static async RenderContainer callRouteWidget(RenderContainer container, string w
 	if (widget_model == null) return [ container ];
 	
 	/* Search */
-	widget_model = await static::callRouteWidgetModel(container, page_model, widget_key, widget_model);
+	widget_model = await static::callRouteWidgetModel(container, widget_key, widget_model);
 	
 	/* Set widget model */
 	page_model <= widgets <= { widget_key } <= widget_model;
@@ -81,9 +81,9 @@ static async RenderContainer callRouteWidget(RenderContainer container, string w
 
 
 /**
- * Extend page model
+ * Extend component model
  */
-pure PageModel extendPageModel(BaseStruct layout, PageModel model, Dict params, string widget_key) => model;
+pure LayoutModel extendComponentModel(LayoutModel layout, string model_path, Dict params) => layout;
 
 
 

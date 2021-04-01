@@ -104,22 +104,19 @@ struct LayoutModel extends BaseStruct
 	/**
 	 * Returns page model
 	 */
-	PageModel getPageModel(Collection model_path = null) =>
-		this.model
-		|> lib::attr( [ this.page_class ].concat(model_path) )
-	;
+	PageModel getModel(Collection model_path = null) => rtl::attr(this, model_path);
 	
 	
 	
 	/**
-	 * Set page
+	 * Returns page model
 	 */
-	LayoutModel setPage(string page_class) => rtl::setAttr(this, ["page_class"], page_class);
+	PageModel getPageModel(Collection model_path = null) => rtl::attr(this.model, [ this.page_class ].concat(model_path));
 	
 	
 	
 	/**
 	 * Set page model
 	 */
-	LayoutModel setPageModel(primitive page_model) => rtl::setAttr(this, ["model", this.layout.page_class], page_model);
+	LayoutModel setPageModel(primitive page_model) => rtl::setAttr(this, ["model", this.page_class], page_model);
 }

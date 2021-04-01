@@ -22,7 +22,6 @@
 		"SeoModel",
 		"WebApp",
 		"Widget",
-		"WidgetEvent",
 		"WidgetModel",
 		"WidgetSignal",
 		"ModuleDescription"

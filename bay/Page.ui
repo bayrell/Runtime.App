@@ -32,8 +32,12 @@
 /**
  * Extend component model
  */
-pure PageModel extendComponentModel(BaseStruct layout, PageModel model, Dict params)
+pure PageModel extendComponentModel(BaseStruct layout, string model_path, Dict params)
 {
+	return layout;
+	
+	PageModel model = layout.getPageModel();
+	
 	Collection widgets = model.widgets.keys();
 	for (int i=0; i<widgets.count(); i++)
 	{
@@ -44,40 +48,45 @@ pure PageModel extendComponentModel(BaseStruct layout, PageModel model, Dict par
 			string widget_class = widget_model.class_name;
 			if (widget_class and rtl::method_exists(widget_class, "extendPageModel"))
 			{
-				model = rtl::applyMethod(widget_class, "extendPageModel", [layout, model, params, widget_key]);
+				layout = rtl::applyMethod(widget_class, "extendPageModel", [layout, model_path, params, widget_key]);
 			}
 		}
 	}
-	return model;
+	
+	return parent::extendComponentModel(layout.setPageModel(model), model_path, params);
 }
 
 </script>
 
 
-<template name="renderWidgets" args="LayoutModel layout, PageModel model, Dict params, string widget_position">
+<template name="renderWidgets" args="LayoutModel layout, string model_path, Dict params, string widget_position">
 
+%var PageModel model = layout.getPageModel();
 %var Collection widgets = model.widgets_position[widget_position] |> default Collection null;
 %if (widgets != null)
 {
 	%for (int i=0; i<widgets.count(); i++)
 	{
 		%var string widget_key = widgets[i];
-		{ static::renderWidget(layout, model, params, widget_key) }
+		{ static::renderWidget(layout, model_path, params, widget_key) }
 	}
 }
 
 </template>
 
 
-<template name="renderWidget" args="LayoutModel layout, PageModel model, Dict params, string widget_key">
-	%var string class_name = rtl::attr(model, ["widgets", widget_key, "class_name"]) |> default string "";
-	%if (class_name != "")
-	{
-		<div class='widget' data-widget={ widget_key } @key={ widget_key }>
-			<{class_name} @bind=["widgets", widget_key] widget_key={ widget_key }
-				@event:WidgetEvent="onWidgetEvent"></{class_name}>
-		</div>
-	}
+<template name="renderWidget" args="LayoutModel layout, string model_path, Dict params, string widget_key">
+
+%var PageModel model = layout.getPageModel();
+%var string class_name = rtl::attr(model, ["widgets", widget_key, "class_name"]) |> default string "";
+%if (class_name != "")
+{
+	<div class='widget' data-widget={ widget_key } @key={ widget_key }>
+		<{class_name} @bind=["widgets", widget_key] widget_key={ widget_key }
+			@event:WidgetEvent="onWidgetEvent"></{class_name}>
+	</div>
+}
+
 </template>
 
 
