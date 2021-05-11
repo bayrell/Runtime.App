@@ -90,50 +90,6 @@ class WebApp extends BaseDriver
 	
 	
 	/**
-	 * Returns widget model
-	 */
-	primitive getWidgetModel(string widget_key)
-	{
-		PageModel page_model = this.driver.layout.model[ this.driver.layout.page_class ];
-		if (page_model == null) return null;
-		return page_model.widgets[widget_key];
-	}
-	
-	
-	
-	/**
-	 * Returns widgets
-	 */
-	primitive getWidgets(string widget_key)
-	{
-		PageModel page_model = this.driver.layout.model[ this.driver.layout.page_class ];
-		if (page_model == null) return null;
-		return page_model.widgets;
-	}
-	
-	
-	
-	/**
-	 * Init app
-	 */
-	static Context appInit(Context c)
-	{
-		return c::appInit(c);
-	}
-	
-	
-	
-	/**
-	 * Start app
-	 */
-	static async Context appStart(Context c)
-	{
-		return await c::appStart(c);
-	}
-	
-	
-	
-	/**
 	 * Start driver
 	 */
 	public async void startDriver()
@@ -143,6 +99,17 @@ class WebApp extends BaseDriver
 		/* Get routes */
 		this.routes = Context::getSubEntities(@.entities, classof RouteList, classof Route);
 		this.route_prefix = @.env("X-ROUTE-PREFIX", "");
+	}
+	
+	
+	
+	/**
+	 * Frontend Run
+	 */
+	static async void frontendRun()
+	{
+		WebApp app = @.getDriver("WebApp");
+		app.driver = @.getDriver("RenderDriver");
 		
 		#ifcode ES6 then
 		
@@ -154,27 +121,16 @@ class WebApp extends BaseDriver
 		window.onpopstate = Runtime.Web.App.WebApp.js_onpopstate;
 		
 		#endif
-	}
-	
-	
-	
-	/**
-	 * Web App Run
-	 */
-	static async void appRun()
-	{
-		WebApp app = @.getDriver("WebApp");
-		app.driver = @.getDriver("RenderDriver");
 		
 		/* Get root controller */
 		RenderController root_controller = app.driver.getController("root");
 		
-		/* Repaint all */
-		@.getDriver("RenderDriver").repaint();
-		
 		#ifcode JAVASCRIPT then
 		window["RootController"] = root_controller;
 		#endif
+		
+		/* Repaint all */
+		@.getDriver("RenderDriver").repaint();
 	}
 	
 	
@@ -693,24 +649,44 @@ class WebApp extends BaseDriver
 	 * @param Dict items
 	 * @return RemoteCallAnswer
 	 */
-	static async RemoteCallAnswer externalBusCall(Dict items)
+	static async RemoteCallAnswer busCall(string url, Dict data, Dict items = null)
 	{
-		/* Set default params */
-		items = items.copy
+		if (items == null) items = {};
+		
+		Collection<string> matches = re::matchAll
+		(
+			"api:\\/\\/([^\\/]*?)\\/([^\\/]*?)\\/([^\\/]*?)\\/([^\\/]*?)\\/",
+			url
+		);
+		
+		/* Is api call ? */
+		if (matches)
 		{
-			"app_name": items.get("app_name", "self"),
-			"interface_name": items.get("interface_name", "default"),
-		};
+			items <= app_name <= matches[0][1];
+			items <= object_name <= matches[0][2];
+			items <= interface_name <= matches[0][3];
+			items <= method_name <= matches[0][4];
+			
+			/* Set default params */
+			items = items.copy
+			{
+				"app_name": items.get("app_name", "self"),
+				"interface_name": items.get("interface_name", "default"),
+				"data": data,
+			};
+			
+			/* Change api request */
+			RemoteCallRequest request = new RemoteCallRequest(items);
+			list res = await @.chainAsync(static::EXTERNAL_BUS_CHAIN, [request]);
+			request = res[0] |> default RemoteCallRequest null;
+			
+			/* Send request */
+			BusInterface bus = @.getDriver("external_bus");
+			RemoteCallAnswer answer = await bus.remoteBusCall(request);
+			
+			return answer;
+		}
 		
-		/* Change api request */
-		RemoteCallRequest request = new RemoteCallRequest(items);
-		list res = await @.chainAsync(static::EXTERNAL_BUS_CHAIN, [request]);
-		request = res[0] |> default RemoteCallRequest null;
-		
-		/* Send request */
-		BusInterface bus = @.getDriver("external_bus");
-		RemoteCallAnswer answer = await bus.remoteBusCall(request);
-		
-		return answer;
+		return null;
 	}
 }

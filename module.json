@@ -21,9 +21,6 @@
 		"Routes",
 		"SeoModel",
 		"WebApp",
-		"Widget",
-		"WidgetModel",
-		"WidgetSignal",
 		"ModuleDescription"
 	]
 }

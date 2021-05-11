@@ -25,29 +25,10 @@ use Runtime.Web.App.WebApp;
 
 struct RemoteCallRequest extends BaseStruct
 {
-	string uri = "";
 	string app_name = "self";
 	string object_name = "";
 	string interface_name = "default";
 	string method_name = "";
 	primitive data = null;
 	Dict<primitive> api_storage = null;
-	
-	
-	/**
-	 * Remote bus call
-	 * @param Dict items
-	 * @return RemoteCallAnswer
-	 */
-	async RemoteCallAnswer externalBusCall(Dict items)
-	{
-		/* Set storage */
-		items = items.copy
-		{
-			"storage": this.api_storage,
-		};
-		
-		/* Send request */
-		return await WebApp::externalBusCall(items);
-	}
 }

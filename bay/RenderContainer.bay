@@ -176,15 +176,15 @@ struct RenderContainer extends BaseStruct
 	 * @param Dict items
 	 * @return RemoteCallAnswer
 	 */
-	async RemoteCallAnswer externalBusCall(Dict items)
+	async RemoteCallAnswer busCall(string url, Dict data)
 	{
 		/* Set storage */
-		items = items.copy
+		Dict items =
 		{
 			"api_storage": this.api_storage,
 		};
 		
 		/* Send request */
-		return await WebApp::externalBusCall(items);
+		return await WebApp::busCall(url, data, items);
 	}
 }

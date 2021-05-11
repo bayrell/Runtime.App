@@ -56,7 +56,6 @@ class ExternalBusDriver extends BaseDriver implements BusInterface
 	 */
 	async RemoteCallAnswer remoteBusCall(RemoteCallRequest request)
 	{
-		string uri = request.uri;
 		string app_name = request.app_name;
 		string object_name = request.object_name;
 		string interface_name = request.interface_name;
@@ -64,9 +63,7 @@ class ExternalBusDriver extends BaseDriver implements BusInterface
 		var data = request.data;
 		
 		string bus_gate = @.env("X-ROUTE-PREFIX", "") ~ "/api";
-		string url = (uri != "") ? uri : 
-			bus_gate  + "/" + app_name + "/" + object_name + '/' + interface_name + '/' + method_name + '/'
-		;
+		string url = bus_gate  + "/" + app_name + "/" + object_name + '/' + interface_name + '/' + method_name + '/';
 		
 		/* Send post */
 		var res = await static::post
