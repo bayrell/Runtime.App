@@ -101,6 +101,11 @@ class SystemBusDriver extends BaseDriver implements BusInterface
 		
 		/* Find api method */
 		BusMethod api_method = this.findBusMethod(request);
+		
+		/* Find api by chain */
+		api_method = await @.chainAsync(WebApp::FIND_SYSTEM_BUS_CHAIN, [request, api_method]) |> attr 1;
+		
+		/* If api method does not find */
 		if (api_method == null)
 		{
 			/* Set exception */

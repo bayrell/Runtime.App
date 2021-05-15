@@ -49,6 +49,8 @@ class WebApp extends BaseDriver
 	static const string RENDER_CHAIN = "Runtime.Web.App.Render";
 	static const string TITLE_CHAIN = "Runtime.Web.App.Title";
 	static const string EXTERNAL_BUS_CHAIN = "Runtime.Web.App.ExternalBus";
+	static const string FIND_EXTERNAL_BUS_CHAIN = "Runtime.Web.App.FindExternalBus";
+	static const string FIND_SYSTEM_BUS_CHAIN = "Runtime.Web.App.FindSystemBus";
 	
 	
 	/* Render Chain */
@@ -570,7 +572,7 @@ class WebApp extends BaseDriver
 	pure RenderContainer renderChain_SetFrontendEnv(RenderContainer container)
 	{
 		container <= frontend_env <= "APP_MODE" <= @.env("APP_MODE", "prod");
-		container <= frontend_env <= "X-APP-HASH" <= RenderDriver::hash(@.main_class);
+		container <= frontend_env <= "X-APP-HASH" <= RenderDriver::hash(@.app_name);
 		container <= frontend_env <= "X-ROUTE-PREFIX" <= @.env("X-ROUTE-PREFIX", "");
 		return [ container ];
 	}
