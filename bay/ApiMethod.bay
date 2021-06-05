@@ -48,8 +48,8 @@ struct ApiMethod extends Entity
 		{
 			"class_name": class_name,
 			"class_method_name": class_method_name,
-			"object_name": class_entity.object_name,
-			"interface_name": class_entity.interface_name,
+			"object_name": class_entity.object_name != "" ? class_entity.object_name : this.object_name,
+			"interface_name": class_entity.interface_name != "" ? class_entity.interface_name : this.interface_name,
 		}
 	;
 	
