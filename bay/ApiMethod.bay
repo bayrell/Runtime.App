@@ -33,8 +33,8 @@ struct ApiMethod extends Entity
 	string uri = "";
 	
 	
-	/* Entity name for task output */
-	string entityName() => this.getClassName() ~ " -> " ~
+	/* Task output */
+	string taskOutput() => this.getClassName() ~ " -> " ~
 		this.class_name ~ "::" ~ this.interface_name ~ "::" ~ this.class_method_name;
 	
 	
